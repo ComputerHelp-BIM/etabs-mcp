@@ -52,6 +52,18 @@ instead of a hang). A whole `/geometry` read is one dispatch, not thousands.
 with each return code checked. Ordering, base-story handling, area coordinate resolution, unit parsing and colour
 conversion all live in Core, where they are tested with fakes.
 
+**Sections and materials use late binding (0.2.0).** The material/section API has dozens of shape-specific getters
+whose names and signatures vary between ETABS versions (`GetISection` vs `GetISection_1`, ...). `SectionService`
+calls them by name through the same reflective engine as `/rpc` (`ApiInvoker.InvokeWithInputs`), reading outputs by
+parameter name. A missing or changed getter becomes a `warnings` entry with `null` values instead of a compile error
+or a failed request. It also keeps all of that logic in Core, where it is unit-tested against fake CSI objects.
+
+**Solid view geometry follows CSI conventions.** The web app sweeps each frame's section profile along local axis 1
+using ETABS's local axes (2 up, or +X for vertical members; 3 = 1 × 2; rotation angle) and cardinal points (e.g. 8 =
+top-centre for beams). Floors hang below their story level; walls are centred. Simplifications: end offsets, rigid
+zones and insertion offsets are ignored; boxes and pipes are drawn solid; openings are not cut; asymmetric profiles
+are placed by their bounding box.
+
 **Zero NuGet dependencies in anything loaded into ETABS.** A plugin DLL runs under `ETABS.exe.config`, so shipping
 System.Text.Json and its seven transitive assemblies risks version conflicts that we cannot fix with binding redirects.
 Core therefore contains a small, strict, tested JSON reader/writer, and the plugin is a single DLL.
@@ -68,11 +80,12 @@ check against DNS rebinding, a body size limit, and a write opt-in. The token re
 **Contract drift is a test failure.** C# writes `contract/fixtures/*.json`. The C# tests require byte-identical output and
 the TypeScript tests validate the same files with the zod schemas.
 
-## Known limits (v0.1.0)
+## Known limits (v0.6.0)
 
-- Geometry only: sections, materials, loads and results are reachable through `/tables` and `/rpc` but have no typed
-  endpoints yet (see the roadmap in the README).
+- Results cover base reactions, drifts, joint reactions/displacements, frame forces and concrete design; modal,
+  response-spectrum detail, shell stresses and steel design are reachable through `/tables` and `/rpc`.
+- Section Designer, non-prismatic and auto-select sections have no dimensions; the solid view draws them with a
+  marked placeholder size.
 - Per-object API calls (labels, restraints, orientation) make very large models (100k+ objects) take seconds;
   bulk database tables could replace them later.
 - Curved frames, cylindrical grid details and openings in areas are not modelled specially.
-- The 3D view draws frames as centre lines (no extruded sections yet).

@@ -1,0 +1,1 @@
+{"units":{"name":"kN_m_C","force":"kN","length":"m","temperature":"C"},"cases":["Dead"],"combinations":["ULS1"],"totalRows":2,"offset":0,"rows":[{"joint":"9","loadCase":"Dead","stepType":"","stepNum":0,"u1":0.012,"u2":0,"u3":-0.003,"r1":0,"r2":0,"r3":0},{"joint":"9","loadCase":"ULS1","stepType":"","stepNum":0,"u1":0.012,"u2":0,"u3":-0.003,"r1":0,"r2":0,"r3":0}],"warnings":[]}

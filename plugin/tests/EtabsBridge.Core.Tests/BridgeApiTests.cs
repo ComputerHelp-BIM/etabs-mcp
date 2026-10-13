@@ -115,6 +115,8 @@ namespace EtabsBridge.Core.Tests
         [InlineData("/api/v1/geometry/areas", "areas")]
         [InlineData("/api/v1/geometry/areas/", "areas")]
         [InlineData("/api/v1/tables", "tables")]
+        [InlineData("/api/v1/sections", "frameSections")]
+        [InlineData("/api/v1/loads", "patterns")]
         public async Task GeometryAndTableEndpoints(string path, string arrayProperty)
         {
             var (response, json) = await Send(Request("GET", path));

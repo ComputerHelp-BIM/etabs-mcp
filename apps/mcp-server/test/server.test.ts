@@ -55,6 +55,17 @@ describe("MCP server against the mock bridge", () => {
         "etabs_get_joints",
         "etabs_get_frames",
         "etabs_get_areas",
+        "etabs_get_sections",
+        "etabs_get_boq",
+        "etabs_generate_schedule",
+        "etabs_get_loads",
+        "etabs_get_analysis_status",
+        "etabs_get_base_reactions",
+        "etabs_get_story_drifts",
+        "etabs_get_joint_reactions",
+        "etabs_get_joint_displacements",
+        "etabs_get_frame_forces",
+        "etabs_get_concrete_design",
         "etabs_list_tables",
         "etabs_get_table",
         "etabs_describe_api",
@@ -94,6 +105,91 @@ describe("MCP server against the mock bridge", () => {
   it("filters joints and areas", async () => {
     expect((await call(client, "etabs_get_joints", { supportsOnly: true })).json.total).toBe(20);
     expect((await call(client, "etabs_get_areas", { type: "Wall", story: "Story1" })).json.total).toBe(3);
+  });
+
+  it("returns sections and materials, filtered", async () => {
+    const all = await call(client, "etabs_get_sections");
+    expect(all.json.materials.map((m: { name: string }) => m.name)).toContain("C35");
+    expect(all.json.frameSections.length).toBeGreaterThan(0);
+
+    const beams = await call(client, "etabs_get_sections", { include: "frameSections", search: "b300" });
+    expect(beams.json.frameSections.map((s: { name: string }) => s.name)).toEqual(["B300x600", "B300x500"]);
+    expect(beams.json.materials).toBeUndefined();
+  });
+
+  it("produces a priced BOQ, flagging sample rates", async () => {
+    const res = await call(client, "etabs_get_boq");
+    expect(res.json.ratesAreSamples).toBe(true);
+    expect(res.json.lines.find((l: { code: string }) => l.code === "CON-C35-COLUMN").unit).toBe("m³");
+    expect(res.json.summary.total).toBeGreaterThan(0);
+    expect(res.json.unmeasuredCount).toBe(0);
+
+    const custom = await call(client, "etabs_get_boq", { groupBy: "story", rates: { "concrete:C35": 100 }, currency: "usd", rebarRatios: { Column: 0 } });
+    expect(custom.json.ratesAreSamples).toBe(false);
+    expect(custom.json.currency).toBe("USD");
+    const col = custom.json.lines.find((l: { code: string }) => l.code === "CON-C35-COLUMN-STORY1");
+    expect(col.rate).toBe(100);
+    expect(custom.json.lines.some((l: { code: string }) => l.code.startsWith("RFT-COLUMN"))).toBe(false);
+    expect(custom.json.lines.find((l: { code: string }) => l.code.startsWith("FWK-")).amount).toBe(0); // unpriced keys are 0, not samples
+  });
+
+  it("generates a 4D schedule with costs", async () => {
+    const res = await call(client, "etabs_generate_schedule", { startDate: "2026-01-05", workingWeekdays: [1, 2, 3, 4, 5] });
+    expect(res.json.tasks).toHaveLength(12); // 6 stories x (vertical + horizontal)
+    expect(res.json.tasks[0]).toMatchObject({ id: "V-Story1", start: "2026-01-05", finish: "2026-01-09" });
+    expect(res.json.span.start).toBe("2026-01-05");
+    const last = res.json.weeklyCumulativeCost[res.json.weeklyCumulativeCost.length - 1];
+    const sumTasks = res.json.tasks.reduce((s: number, t: { cost: number }) => s + t.cost, 0);
+    expect(Math.abs(last.cumulativeCost - sumTasks)).toBeLessThanOrEqual(12); // rounding per task
+    expect(res.json.ratesAreSamples).toBe(true);
+  });
+
+  it("summarizes loads and pages assigned loads", async () => {
+    const sum = await call(client, "etabs_get_loads");
+    expect(sum.json.patterns).toHaveLength(4);
+    expect(sum.json.combinations[0].formula).toBe("1.5 × Dead + 1.5 × SDL + 1.5 × Live");
+    const live = sum.json.gravityTakedown.find((r: { pattern: string }) => r.pattern === "Live");
+    expect(live.total).toBeCloseTo(72 * 30 * 3); // 72 slabs of 6 x 5 m at 3 kN/m²
+    const areas = await call(client, "etabs_get_loads", { include: "areaUniform", pattern: "Live", limit: 10 });
+    expect(areas.json.total).toBe(72);
+    expect(areas.json.returned).toBe(10);
+  });
+
+  it("reads analysis results", async () => {
+    const status = await call(client, "etabs_get_analysis_status");
+    expect(status.json.isLocked).toBe(true);
+    expect(status.json.combinations).toContain("ENVELOPE");
+
+    const base = await call(client, "etabs_get_base_reactions", { cases: ["Dead"], combos: ["ENVELOPE"] });
+    expect(base.json.rows.map((r: { stepType: string }) => r.stepType)).toEqual(["", "Max", "Min"]);
+
+    const drifts = await call(client, "etabs_get_story_drifts", { cases: ["EQX"] });
+    expect(drifts.json.envelope).toHaveLength(6);
+    expect(drifts.json.maximum.direction).toBe("X");
+    expect(drifts.json.rows).toBeUndefined();
+
+    const forces = await call(client, "etabs_get_frame_forces", { cases: ["Dead"], frame: "1" });
+    expect(forces.json.rows).toHaveLength(3);
+
+    const reactions = await call(client, "etabs_get_joint_reactions", { combos: ["1.5(D+L)"], limit: 5 });
+    expect(reactions.json.rows).toHaveLength(5);
+    expect(reactions.json.totalRows).toBe(20);
+
+    const noSelection = await call(client, "etabs_get_base_reactions", {});
+    expect(noSelection.isError).toBe(true);
+    expect(noSelection.text).toMatch(/BAD_REQUEST/);
+  });
+
+  it("summarises concrete design and feeds design rebar into the BOQ", async () => {
+    const design = await call(client, "etabs_get_concrete_design", { limit: 1000 });
+    expect(design.json.items.length).toBeGreaterThan(100);
+    expect(design.json.items[0].requiredRebarKg).toBeGreaterThan(0);
+
+    const ratioBoq = await call(client, "etabs_get_boq");
+    const designBoq = await call(client, "etabs_get_boq", { useDesignRebar: true });
+    expect(designBoq.json.rebarFromDesign.frames).toBeGreaterThan(100);
+    const rebar = (r: typeof ratioBoq) => r.json.lines.filter((l: { item: string }) => l.item === "Reinforcement").reduce((s: number, l: { quantity: number }) => s + l.quantity, 0);
+    expect(rebar(designBoq)).not.toBeCloseTo(rebar(ratioBoq));
   });
 
   it("validates tool input", async () => {

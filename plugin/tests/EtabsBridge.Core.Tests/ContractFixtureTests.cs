@@ -59,6 +59,32 @@ namespace EtabsBridge.Core.Tests
         }
 
         [Fact]
+        public void SectionsMatchContract()
+        {
+            AssertMatchesFixture("sections.json", new SectionService(new FakeEtabsModel()).GetSections());
+        }
+
+        [Fact]
+        public void LoadsMatchContract()
+        {
+            AssertMatchesFixture("loads.json", new LoadsService(new FakeEtabsModel()).GetLoads());
+        }
+
+        [Fact]
+        public void ResultsMatchContract()
+        {
+            var svc = new ResultsService(new FakeEtabsModel());
+            var sel = new OutputSelection { Cases = new[] { "Dead" }, Combinations = new[] { "ULS1" } };
+            AssertMatchesFixture("results-status.json", svc.GetStatus());
+            AssertMatchesFixture("results-base-reactions.json", svc.GetBaseReactions(sel));
+            AssertMatchesFixture("results-story-drifts.json", svc.GetStoryDrifts(sel));
+            AssertMatchesFixture("results-joint-reactions.json", svc.GetJointReactions(sel, null));
+            AssertMatchesFixture("results-joint-displacements.json", svc.GetJointDisplacements(sel, null));
+            AssertMatchesFixture("results-frame-forces.json", svc.GetFrameForces(sel, "3"));
+            AssertMatchesFixture("design-concrete.json", svc.GetConcreteDesign());
+        }
+
+        [Fact]
         public void TablesMatchContract()
         {
             var model = new FakeEtabsModel();

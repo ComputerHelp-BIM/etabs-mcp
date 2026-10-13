@@ -15,8 +15,25 @@ namespace EtabsBridge.Core.Rpc
         /// </summary>
         public static readonly IReadOnlyList<string> ReadOnlyPrefixes = new[] { "Get", "Count" };
 
-        public static bool IsReadOnly(string methodName) =>
-            ReadOnlyPrefixes.Any(p => methodName.StartsWith(p, StringComparison.Ordinal));
+        /// <summary>
+        /// API objects whose every method is read-only regardless of its name: the Results object reads
+        /// analysis results (BaseReact, JointDispl, FrameForce, ...) and Results.Setup only chooses which
+        /// cases are reported (e.g. SetCaseSelectedForOutput); neither changes model data.
+        /// </summary>
+        public static readonly IReadOnlyList<string> ReadOnlyObjects = new[] { "Results." };
+
+        /// <param name="methodNameOrPath">A method name ("GetSection") or full path ("Results.Setup.SetCaseSelectedForOutput").</param>
+        public static bool IsReadOnly(string methodNameOrPath)
+        {
+            if (ReadOnlyObjects.Any(o => methodNameOrPath.StartsWith(o, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            int dot = methodNameOrPath.LastIndexOf('.');
+            string name = dot >= 0 ? methodNameOrPath.Substring(dot + 1) : methodNameOrPath;
+            return ReadOnlyPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal));
+        }
     }
 
     /// <summary>Reflection helpers that see members inherited through interface inheritance.</summary>

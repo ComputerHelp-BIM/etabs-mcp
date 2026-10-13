@@ -1,6 +1,6 @@
 {
   "name": "@etabs-bridge/mcp-server",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Model Context Protocol server exposing running ETABS models (via the ETABS Bridge plugin) to AI assistants.",
   "type": "module",
@@ -15,11 +15,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@etabs-bridge/client": "0.1.0",
+    "@etabs-bridge/client": "0.6.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@etabs-bridge/mock-bridge": "0.1.0"
+    "@etabs-bridge/mock-bridge": "0.6.0"
   }
 }

@@ -6,10 +6,11 @@ A small ETABS plugin starts a token-protected **local REST API** inside the exac
 **web app** shows the model in 3D with data tables, an **MCP server** lets Claude and other AI clients query it, and
 **DraftWin** (VB.NET) can use the same API or the same C# library directly.
 
-Version **0.1.0**: step 1 of the roadmap (geometry). The full CSI API and every ETABS database table are already
+Version **0.2.0**: geometry plus **sections & materials**, a **solid (concrete) 3D view** next to the analytical one,
+colouring bound to model data, and **Vercel** deployment. The full CSI API and every ETABS database table are also
 reachable through generic endpoints.
 
-![3D view of the sample model](docs/images/web-3d.png)
+![Solid 3D view of the sample model, coloured by material](docs/images/web-3d.png)
 
 ## What's inside
 
@@ -23,7 +24,8 @@ reachable through generic endpoints.
 | API contract fixtures | `contract/fixtures` | JSON golden files checked by C# **and** TS tests |
 
 Read next: [architecture & decisions](docs/architecture.md) · [REST API](docs/api.md) ·
-[install the plugin](docs/install-plugin.md) · [DraftWin (VB.NET)](docs/draftwin-integration.md) · [MCP](docs/mcp.md)
+[install the plugin](docs/install-plugin.md) · [deploy on Vercel](docs/deploy-vercel.md) ·
+[BOQ & 5D](docs/boq-5d.md) · [4D](docs/4d-simulation.md) · [Results](docs/results.md) · [DraftWin (VB.NET)](docs/draftwin-integration.md) · [MCP](docs/mcp.md)
 
 ## Quick start without ETABS (any OS)
 
@@ -78,9 +80,10 @@ const section = await etabs.call("FrameObj.GetSection", { Name: frames[0].name }
 | Regenerate contract fixtures after an intentional change | `UPDATE_FIXTURES=1 dotnet test plugin/tests/EtabsBridge.Core.Tests` |
 | Version consistency | `npm run check-versions` |
 
-Test coverage: 132 C# tests (JSON, geometry rules, RPC, HTTP security, real sockets, discovery, settings, dispatcher,
-contract) and 51 TypeScript tests (client, registry, mock bridge, MCP tools over an in-memory transport, 3D scene
-building).
+Test coverage: 196 C# tests (JSON, geometry rules, late-bound sections/loads/results, RPC policy, HTTP security,
+origin matching, real sockets, discovery, settings, dispatcher, contract fixtures) and 137 TypeScript tests (client,
+quantities/BOQ/costing, schedule, loads takedown, result helpers, registry, mock bridge, MCP tools over an in-memory
+transport, 3D scene and solid extrusion geometry, colour binding, charts).
 
 ## Versioning
 
@@ -92,8 +95,10 @@ building).
 
 | Version | Step |
 | --- | --- |
-| **0.1.0** | Geometry: stories, grids, joints, frames, areas; generic tables + RPC; web app; MCP |
-| 0.2.0 | Sections & materials: frame/area properties, material properties, per-object assignments |
-| 0.3.0 | Loads: patterns, cases, combinations, assigned loads |
-| 0.4.0 | Analysis results: reactions, drifts, joint displacements, frame forces (with case/combo selection) |
-| 0.5.0 | Write workflows (opt-in): guarded edits from the web app/DraftWin, change notifications |
+| 0.1.0 | Geometry: stories, grids, joints, frames, areas; generic tables + RPC; web app; MCP |
+| 0.2.0 | Sections & materials; solid concrete 3D view; colour by type/material/section/story; Vercel deployment |
+| 0.3.0 | BOQ (concrete, formwork, rebar, steel) and 5D costing with editable rates; CSV/JSON exchange |
+| 0.4.0 | 4D simulation: story-by-story schedule, playback in 3D, Gantt, planned-cost S-curve |
+| 0.5.0 | Loads: patterns, cases, combinations, assigned loads, gravity takedown |
+| **0.6.0** | Results: reactions, drifts, displacements (deformed shape), frame forces, concrete design → BOQ rebar |
+| next | Field-test fixes from real ETABS; write workflows (opt-in, guarded); shared project storage (team rates/schedules) if needed |

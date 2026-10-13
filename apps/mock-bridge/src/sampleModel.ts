@@ -4,6 +4,8 @@ import type {
   GeometrySnapshot,
   GridLine,
   Joint,
+  LoadsResult,
+  SectionsResult,
   Story,
   TableData,
   TableInfo,
@@ -25,6 +27,8 @@ export interface SampleModelOptions {
 
 export interface SampleModel {
   geometry: GeometrySnapshot;
+  sections: SectionsResult;
+  loads: LoadsResult;
   tables: TableInfo[];
   tableData: Map<string, Omit<TableData, "totalRows" | "offset" | "group">>;
 }
@@ -210,7 +214,7 @@ export function createSampleModel(options: SampleModelOptions = {}): SampleModel
       isLocked: false,
       units,
       processId: options.processId ?? process.pid,
-      bridgeVersion: "0.1.0-mock",
+      bridgeVersion: "0.6.0-mock",
     },
     units,
     baseElevation: 0,
@@ -253,5 +257,155 @@ export function createSampleModel(options: SampleModelOptions = {}): SampleModel
     { key: "Story Drifts", name: "Story Drifts", importType: 0, isEmpty: true },
   ];
 
-  return { geometry, tables, tableData };
+  return { geometry, sections: sampleSections(units), loads: sampleLoads(geometry), tables, tableData };
+}
+
+const props = (b: number, d: number) => {
+  const area = b * d;
+  const i33 = (b * d ** 3) / 12;
+  const i22 = (d * b ** 3) / 12;
+  return {
+    area,
+    as2: (area * 5) / 6,
+    as3: (area * 5) / 6,
+    torsion: 0.141 * Math.max(b, d) * Math.min(b, d) ** 3,
+    i22,
+    i33,
+    s22: i22 / (b / 2),
+    s33: i33 / (d / 2),
+    z22: (d * b ** 2) / 4,
+    z33: (b * d ** 2) / 4,
+    r22: Math.sqrt(i22 / area),
+    r33: Math.sqrt(i33 / area),
+  };
+};
+
+/** Sections and materials used by createSampleModel (kN, m). */
+function sampleSections(units: SectionsResult["units"]): SectionsResult {
+  const rect = (name: string, b: number, d: number) => ({
+    name,
+    shape: "Rectangular" as const,
+    etabsType: "Rectangular",
+    material: "C35",
+    color: "#a0a0a0",
+    depth: d,
+    width: b,
+    flangeThickness: null,
+    webThickness: null,
+    bottomWidth: null,
+    bottomFlangeThickness: null,
+    properties: props(b, d),
+  });
+  return {
+    units,
+    materials: [
+      { name: "C35", type: "Concrete", color: "#a0a0a0", e: 29_580_000, poisson: 0.2, thermalCoefficient: 1e-5, unitWeight: 25, fc: 35_000, fy: null, fu: null },
+      { name: "HRB500", type: "Rebar", color: "#b05050", e: 200_000_000, poisson: null, thermalCoefficient: 1.17e-5, unitWeight: 76.98, fc: null, fy: 500_000, fu: 545_000 },
+      { name: "S355", type: "Steel", color: "#4a7fb5", e: 200_000_000, poisson: 0.3, thermalCoefficient: 1.17e-5, unitWeight: 76.98, fc: null, fy: 355_000, fu: 490_000 },
+    ],
+    frameSections: [
+      rect("C600", 0.6, 0.6),
+      rect("C400", 0.4, 0.4),
+      rect("B300x600", 0.3, 0.6),
+      rect("B300x500", 0.3, 0.5),
+      {
+        name: "HSS200x10",
+        shape: "Box",
+        etabsType: "Box",
+        material: "S355",
+        color: "#4a7fb5",
+        depth: 0.2,
+        width: 0.2,
+        flangeThickness: 0.01,
+        webThickness: 0.01,
+        bottomWidth: null,
+        bottomFlangeThickness: null,
+        properties: { ...props(0.2, 0.2), area: 0.2 * 0.2 - 0.18 * 0.18 },
+      },
+    ],
+    areaSections: [
+      { name: "Slab200", kind: "Slab", subType: "Slab", shellType: "ShellThin", material: "C35", thickness: 0.2, color: "#9fb8c8" },
+      { name: "Wall250", kind: "Wall", subType: "Specified", shellType: "ShellThin", material: "C35", thickness: 0.25, color: "#c8a46a" },
+    ],
+    warnings: [],
+  };
+}
+
+/** Typical gravity + lateral loading: SDL 1.5 and Live 3 kN/m² on floors, 10 kN/m facade on edge beams, EQX at one corner per story. */
+function sampleLoads(g: GeometrySnapshot): LoadsResult {
+  const maxX = Math.max(...g.joints.map((j) => j.x));
+  const maxY = Math.max(...g.joints.map((j) => j.y));
+  const edge = (f: FrameMember) =>
+    f.type === "Beam" &&
+    ((f.start.y === 0 && f.end.y === 0) || (f.start.y === maxY && f.end.y === maxY) || (f.start.x === 0 && f.end.x === 0) || (f.start.x === maxX && f.end.x === maxX));
+  const floors = g.areas.filter((a) => a.type === "Floor");
+  const corner = g.joints.filter((j) => j.x === 0 && j.y === 0 && j.story !== "Base");
+  return {
+    units: g.units,
+    patterns: [
+      { name: "Dead", type: "Dead", selfWeightMultiplier: 1 },
+      { name: "SDL", type: "SuperDead", selfWeightMultiplier: 0 },
+      { name: "Live", type: "Live", selfWeightMultiplier: 0 },
+      { name: "EQX", type: "Quake", selfWeightMultiplier: 0 },
+    ],
+    cases: [
+      { name: "Dead", type: "LinearStatic", subType: 0 },
+      { name: "SDL", type: "LinearStatic", subType: 0 },
+      { name: "Live", type: "LinearStatic", subType: 0 },
+      { name: "EQX", type: "LinearStatic", subType: 0 },
+      { name: "Modal", type: "Modal", subType: 1 },
+    ],
+    combinations: [
+      {
+        name: "1.5(D+L)",
+        type: "LinearAdditive",
+        items: [
+          { kind: "LoadCase", name: "Dead", factor: 1.5 },
+          { kind: "LoadCase", name: "SDL", factor: 1.5 },
+          { kind: "LoadCase", name: "Live", factor: 1.5 },
+        ],
+      },
+      {
+        name: "1.2(D+L+EQX)",
+        type: "LinearAdditive",
+        items: [
+          { kind: "LoadCase", name: "Dead", factor: 1.2 },
+          { kind: "LoadCase", name: "SDL", factor: 1.2 },
+          { kind: "LoadCase", name: "Live", factor: 1.2 },
+          { kind: "LoadCase", name: "EQX", factor: 1.2 },
+        ],
+      },
+      {
+        name: "ENVELOPE",
+        type: "Envelope",
+        items: [
+          { kind: "LoadCombo", name: "1.5(D+L)", factor: 1 },
+          { kind: "LoadCombo", name: "1.2(D+L+EQX)", factor: 1 },
+        ],
+      },
+    ],
+    frameDistributed: g.frames.filter(edge).map((f) => {
+      const length = Math.hypot(f.end.x - f.start.x, f.end.y - f.start.y, f.end.z - f.start.z);
+      return {
+        frame: f.name,
+        pattern: "SDL",
+        loadType: "Force" as const,
+        cSys: "Global",
+        direction: 10,
+        relativeStart: 0,
+        relativeEnd: 1,
+        distanceStart: 0,
+        distanceEnd: length,
+        valueStart: 10,
+        valueEnd: 10,
+      };
+    }),
+    framePoint: [],
+    areaUniform: floors.flatMap((a) => [
+      { area: a.name, pattern: "SDL", cSys: "Global", direction: 10, value: 1.5 },
+      { area: a.name, pattern: "Live", cSys: "Global", direction: 10, value: 3 },
+    ]),
+    jointLoads: corner.map((j, i) => ({ joint: j.name, pattern: "EQX", cSys: "Global", f1: 40 * (i + 1), f2: 0, f3: 0, m1: 0, m2: 0, m3: 0 })),
+    warnings: [],
+  };
 }
