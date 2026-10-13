@@ -56,6 +56,7 @@ describe("MCP server against the mock bridge", () => {
         "etabs_get_frames",
         "etabs_get_areas",
         "etabs_get_sections",
+        "etabs_get_boq",
         "etabs_list_tables",
         "etabs_get_table",
         "etabs_describe_api",
@@ -105,6 +106,22 @@ describe("MCP server against the mock bridge", () => {
     const beams = await call(client, "etabs_get_sections", { include: "frameSections", search: "b300" });
     expect(beams.json.frameSections.map((s: { name: string }) => s.name)).toEqual(["B300x600", "B300x500"]);
     expect(beams.json.materials).toBeUndefined();
+  });
+
+  it("produces a priced BOQ, flagging sample rates", async () => {
+    const res = await call(client, "etabs_get_boq");
+    expect(res.json.ratesAreSamples).toBe(true);
+    expect(res.json.lines.find((l: { code: string }) => l.code === "CON-C35-COLUMN").unit).toBe("m³");
+    expect(res.json.summary.total).toBeGreaterThan(0);
+    expect(res.json.unmeasuredCount).toBe(0);
+
+    const custom = await call(client, "etabs_get_boq", { groupBy: "story", rates: { "concrete:C35": 100 }, currency: "usd", rebarRatios: { Column: 0 } });
+    expect(custom.json.ratesAreSamples).toBe(false);
+    expect(custom.json.currency).toBe("USD");
+    const col = custom.json.lines.find((l: { code: string }) => l.code === "CON-C35-COLUMN-STORY1");
+    expect(col.rate).toBe(100);
+    expect(custom.json.lines.some((l: { code: string }) => l.code.startsWith("RFT-COLUMN"))).toBe(false);
+    expect(custom.json.lines.find((l: { code: string }) => l.code.startsWith("FWK-")).amount).toBe(0); // unpriced keys are 0, not samples
   });
 
   it("validates tool input", async () => {

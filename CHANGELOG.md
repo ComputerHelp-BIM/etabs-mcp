@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-13
+
+### Added
+
+- **BOQ (quantity take-off)** from the live model: concrete m³ by grade and element type, formwork m², reinforcement
+  kg (editable kg/m³ ratios), structural steel t; grouped by item or by item and story; wastage %; SI output for any
+  model unit system. Unmeasurable objects are listed, never guessed. See `docs/boq-5d.md`.
+- **5D costing**: editable rate table (currency, concrete per grade, formwork per element type, rebar, steel per
+  grade) with clearly flagged sample rates; totals by item, element type and story; cost-by-story chart.
+- **Project files**: settings and rates are kept per model in the browser, with export/import as JSON; BOQ and rates
+  export/import as CSV (formula-injection safe).
+- MCP tool `etabs_get_boq` (optional rates, currency, rebar-ratio overrides, grouping).
+- Shared client modules `units`, `quantities`, `costing`.
+
 ## [0.2.0] - 2026-10-13
 
 ### Added

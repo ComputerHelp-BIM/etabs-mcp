@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import {
   BridgeError,
+  computeElementQuantities,
   summarizeGeometry,
   type AreaObject,
   type AreaSection,
@@ -15,7 +16,9 @@ import {
   type Story,
 } from "@etabs-bridge/client";
 import { useAsync } from "../state/useAsync";
+import { useProject } from "../state/useProject";
 import { ApiConsole } from "./ApiConsole";
+import { BoqView } from "./BoqView";
 import { explain } from "./ConnectPanel";
 import { DataTable, type Column } from "./DataTable";
 import type { Selection } from "./ModelViewer";
@@ -34,6 +37,7 @@ const TABS = [
   "Areas",
   "Sections",
   "Materials",
+  "BOQ & Cost",
   "Database tables",
   "API console",
 ] as const;
@@ -52,6 +56,16 @@ export function Workspace({ client, onDisconnect }: Props) {
     [client],
   );
   const sections = sectionsState.data ?? null;
+  const modelKey = geometry.data ? geometry.data.model.filePath || geometry.data.model.fileName || "unsaved" : "unsaved";
+  const [project, updateProject, replaceProject] = useProject(modelKey);
+  const elements = useMemo(() => {
+    if (!geometry.data || !sections) return null;
+    try {
+      return computeElementQuantities(geometry.data, sections, { settings: project.quantitySettings });
+    } catch {
+      return null; // e.g. unknown unit system; the BOQ tab explains
+    }
+  }, [geometry.data, sections, project.quantitySettings]);
   const [tab, setTab] = useState<Tab>("3D view");
   const [selection, setSelection] = useState<Selection>(null);
   const g = geometry.data;
@@ -133,6 +147,21 @@ export function Workspace({ client, onDisconnect }: Props) {
         {g && tab === "Areas" && <AreasTable geometry={g} onSelect={(a) => setSelection({ kind: "area", name: a.name })} selected={selection} />}
         {tab === "Sections" && <SectionsView sections={sections} loading={sectionsState.status === "loading"} geometry={g} />}
         {tab === "Materials" && <MaterialsView sections={sections} loading={sectionsState.status === "loading"} />}
+        {g && tab === "BOQ & Cost" &&
+          (elements ? (
+            <BoqView
+              modelName={g.model.fileName}
+              storyOrder={["Base", ...g.stories.map((st) => st.name)]}
+              elements={elements}
+              project={project}
+              update={updateProject}
+              replace={replaceProject}
+            />
+          ) : (
+            <p className="muted pad">
+              {sectionsState.status === "loading" ? "Reading sections…" : "Quantities need section data (ETABS Bridge 0.2.0 or newer) and a recognised unit system."}
+            </p>
+          ))}
         {tab === "Database tables" && <TablesBrowser client={client} />}
         {tab === "API console" && <ApiConsole client={client} />}
       </main>

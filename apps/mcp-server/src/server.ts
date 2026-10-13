@@ -3,6 +3,14 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
   AREA_TYPES,
+  BOQ_NOTES,
+  DEFAULT_QUANTITY_SETTINGS,
+  ELEMENT_CATEGORIES,
+  buildBoq,
+  computeElementQuantities,
+  defaultRateTable,
+  priceBoq,
+  summarizeCost,
   BridgeError,
   FRAME_TYPES,
   summarizeGeometry,
@@ -14,7 +22,7 @@ import {
 import { ConnectionError, type ConnectionResolver } from "./connection.js";
 
 export const SERVER_NAME = "etabs-bridge";
-export const SERVER_VERSION = "0.2.0";
+export const SERVER_VERSION = "0.3.0";
 
 export interface ServerOptions {
   resolver: ConnectionResolver;
@@ -261,6 +269,59 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
         ...(include === "all" || include === "frameSections" ? { frameSections: match(all.frameSections) } : {}),
         ...(include === "all" || include === "areaSections" ? { areaSections: match(all.areaSections) } : {}),
         warnings: all.warnings,
+      };
+    }),
+  );
+
+  server.registerTool(
+    "etabs_get_boq",
+    {
+      title: "Bill of quantities and cost (5D)",
+      description:
+        "Quantity take-off from the live model: concrete m³ by grade and element type, formwork m², reinforcement kg " +
+        "(kg/m³ ratios, overridable), structural steel t; optionally per story. Priced with the given rates, or with clearly " +
+        "marked SAMPLE rates when none are given (state that to the user). Gross centre-line quantities; see 'notes'.",
+      inputSchema: {
+        instance,
+        groupBy: z.enum(["item", "story"]).default("item").describe("Aggregate per BOQ item, or per item and story."),
+        rebarRatios: z
+          .partialRecord(z.enum(ELEMENT_CATEGORIES), z.number().min(0).max(1000))
+          .optional()
+          .describe("kg of rebar per m³ of concrete by element type, e.g. {\"Column\":200}. Others keep defaults."),
+        rates: z
+          .record(z.string(), z.number().min(0))
+          .optional()
+          .describe("Unit rates by rate key (concrete:<grade>, formwork:<Column|Beam|Slab|Wall|Brace|Other>, rebar, steel:<grade>)."),
+        currency: z.string().regex(/^[A-Za-z]{3}$/).optional().describe("ISO currency code for the given rates, e.g. INR."),
+      },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, groupBy, rebarRatios, rates, currency }) => {
+      const client = resolver.client(pid);
+      const [geometry, sections] = await Promise.all([
+        cached(client, "geometry", () => client.geometry()),
+        cached(client, "sections", () => client.sections()),
+      ]);
+      const settings = { ...DEFAULT_QUANTITY_SETTINGS, rebarRatios: { ...DEFAULT_QUANTITY_SETTINGS.rebarRatios, ...rebarRatios } };
+      const elements = computeElementQuantities(geometry, sections, { settings });
+      const lines = buildBoq(elements, { groupBy, settings });
+      const sample = defaultRateTable(lines, undefined, currency?.toUpperCase() ?? "INR");
+      const table = rates
+        ? { currency: currency?.toUpperCase() ?? "INR", rates: { ...Object.fromEntries(Object.keys(sample.rates).map((k) => [k, 0])), ...rates }, isSample: false }
+        : sample;
+      const priced = priceBoq(lines, table);
+      const summary = summarizeCost(priced, elements, table);
+      const issues = elements.filter((e) => e.issue).map((e) => ({ object: `${e.kind} ${e.name}`, issue: e.issue }));
+      return {
+        model: geometry.model.fileName,
+        ratesAreSamples: table.isSample,
+        currency: table.currency,
+        rebarRatios: settings.rebarRatios,
+        lines: priced.map((l) => ({ ...l, quantity: Math.round(l.quantity * 1000) / 1000, amount: Math.round(l.amount * 100) / 100 })),
+        summary,
+        unmeasured: issues.slice(0, 50),
+        unmeasuredCount: issues.length,
+        notes: BOQ_NOTES,
       };
     }),
   );

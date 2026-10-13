@@ -603,3 +603,180 @@ tr.selected:hover {
   color: var(--text);
   font-size: 0.85rem;
 }
+
+/* Charts (data-viz tokens validated for colour-vision deficiency in both modes) */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --chart-grid: #e6e8ec;
+  --chart-axis: #5d6878;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --chart-grid: #2a323d;
+    --chart-axis: #97a3b4;
+  }
+}
+
+.chart {
+  position: relative;
+}
+
+.chart-svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-svg:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart-axis {
+  fill: var(--chart-axis);
+  font-size: 11px;
+}
+
+.chart-label {
+  fill: var(--text);
+  font-size: 12px;
+}
+
+.chart-value {
+  fill: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-hit {
+  cursor: default;
+  outline: none;
+}
+
+.chart-hit:focus-visible rect:first-child {
+  stroke: var(--accent);
+}
+
+.chart-crosshair,
+.chart-marker {
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+}
+
+.chart-marker {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.chart-dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.line-key {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* BOQ */
+.boq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+  align-items: start;
+}
+
+.pad-sm {
+  padding: 0.75rem 1rem;
+}
+
+.pad-sm h2 {
+  margin-top: 0;
+}
+
+.spaced {
+  margin-top: 1rem;
+}
+
+.flush {
+  margin: 0 0 0.75rem;
+}
+
+table.compact td,
+table.compact th {
+  padding: 0.2rem 0.4rem;
+}
+
+.num-input {
+  width: 7rem;
+  text-align: right;
+  padding: 0.2rem 0.4rem;
+}
+
+input.short {
+  width: 4rem;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.inline-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.inline-fields label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+}
+
+.total-line {
+  text-align: right;
+  font-size: 1.05rem;
+}
