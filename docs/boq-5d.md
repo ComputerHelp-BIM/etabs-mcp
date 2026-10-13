@@ -29,7 +29,11 @@ designed frames.
   (`rebar`), and one per steel grade (`steel:S355`).
 - A new model starts with **sample INR rates**, clearly flagged in the app and in MCP output (`ratesAreSamples`).
   They are there so the screen is not empty, not as market prices.
-- The currency is any 3-letter ISO code; amounts are not converted, just labelled.
+- **Currency:** INR by default. The picker lists INR and the ten most traded currencies (USD, EUR, JPY, GBP, CNY,
+  AUD, CAD, CHF, HKD, SGD; BIS 2022 FX-turnover ranking); *Other* accepts any ISO 4217 code. Changing it **relabels**
+  amounts and never converts rates (sample rates stay flagged as INR samples). Amounts are written as
+  `INR 1,72,51,247`: the code avoids an ambiguous `$`, and digit grouping and short forms follow the currency
+  (lakh/crore for INR, e.g. `1.7Cr`; thousands/millions elsewhere, e.g. `17.3M`).
 - **Rates CSV:** two columns, `rate_key,rate`, plus an optional `currency,XXX` row. Edit it in Excel and import it.
   Invalid rows are reported and skipped.
 - **Project JSON:** settings + rates (+ the 4D schedule from 0.4.0) for this model. Use it to back up or share a

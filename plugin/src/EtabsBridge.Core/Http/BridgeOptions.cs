@@ -20,7 +20,7 @@ namespace EtabsBridge.Core.Http
         /// "https://app.example.com". "*" allows any origin; the token is still required.
         /// Requests without an Origin header (DraftWin, MCP, curl) are not affected.
         /// </summary>
-        public IReadOnlyList<string> AllowedOrigins { get; set; } = new[] { "http://localhost:5173", "http://127.0.0.1:5173" };
+        public IReadOnlyList<string> AllowedOrigins { get; set; } = Configuration.BridgeSettings.DefaultAllowedOrigins;
 
         /// <summary>Max time a request waits for ETABS (queue + execution) before 503 ETABS_BUSY.</summary>
         public TimeSpan CallTimeout { get; set; } = TimeSpan.FromSeconds(120);

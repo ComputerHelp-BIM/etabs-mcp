@@ -14,13 +14,28 @@ namespace EtabsBridge.Core.Configuration
     /// </summary>
     public sealed class BridgeSettings
     {
+        /// <summary>The hosted sample web app (Vercel production deployment of the dev branch).</summary>
+        public const string HostedWebAppUrl = "https://etabs-bridge.vercel.app/";
+
+        /// <summary>
+        /// Default CORS allow-list: the hosted web app, its Vercel preview deployments (only the
+        /// "computer-help" team can create hosts with that suffix) and the local dev server.
+        /// </summary>
+        public static IReadOnlyList<string> DefaultAllowedOrigins { get; } = new[]
+        {
+            "https://etabs-bridge.vercel.app",
+            "https://etabs-bridge-*-computer-help.vercel.app",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        };
+
         public int PreferredPort { get; set; } = 52780;
 
         /// <summary>Browser origins allowed to call the bridge. Add your web app's origin here.</summary>
-        public IReadOnlyList<string> AllowedOrigins { get; set; } = new[] { "http://localhost:5173", "http://127.0.0.1:5173" };
+        public IReadOnlyList<string> AllowedOrigins { get; set; } = DefaultAllowedOrigins;
 
         /// <summary>Opened by the "Open web app" button, with the connection in the URL fragment.</summary>
-        public string WebAppUrl { get; set; } = "http://localhost:5173/";
+        public string WebAppUrl { get; set; } = HostedWebAppUrl;
 
         public int CallTimeoutSeconds { get; set; } = 120;
 

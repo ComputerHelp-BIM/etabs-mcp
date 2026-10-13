@@ -20,17 +20,17 @@ namespace EtabsBridge.Core.Services
     /// </summary>
     public sealed class SectionService
     {
-        /// <summary>Normalized frame shape -> dimension getters to try, newest first.</summary>
+        /// <summary>Normalized frame shape -> dimension getters (full API paths) to try, newest first.</summary>
         private static readonly Dictionary<string, string[]> DimensionGetters = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["Rectangular"] = new[] { "GetRectangle" },
-            ["Circle"] = new[] { "GetCircle" },
-            ["I"] = new[] { "GetISection_1", "GetISection" },
-            ["Box"] = new[] { "GetTube_1", "GetTube" },
-            ["Pipe"] = new[] { "GetPipe" },
-            ["Tee"] = new[] { "GetTee_1", "GetTee", "GetConcreteTee" },
-            ["Angle"] = new[] { "GetAngle_1", "GetAngle", "GetConcreteL" },
-            ["Channel"] = new[] { "GetChannel_1", "GetChannel" },
+            ["Rectangular"] = new[] { "PropFrame.GetRectangle" },
+            ["Circle"] = new[] { "PropFrame.GetCircle" },
+            ["I"] = new[] { "PropFrame.GetISection_1", "PropFrame.GetISection" },
+            ["Box"] = new[] { "PropFrame.GetTube_1", "PropFrame.GetTube" },
+            ["Pipe"] = new[] { "PropFrame.GetPipe" },
+            ["Tee"] = new[] { "PropFrame.GetTee_1", "PropFrame.GetTee", "PropFrame.GetConcreteTee" },
+            ["Angle"] = new[] { "PropFrame.GetAngle_1", "PropFrame.GetAngle", "PropFrame.GetConcreteL" },
+            ["Channel"] = new[] { "PropFrame.GetChannel_1", "PropFrame.GetChannel" },
         };
 
         private readonly IEtabsModel _model;
@@ -139,7 +139,7 @@ namespace EtabsBridge.Core.Services
 
                 if (DimensionGetters.TryGetValue(s.Shape, out string[]? getters))
                 {
-                    ApiCallResult? dims = _api.FirstAvailable(Array.ConvertAll(getters, g => "PropFrame." + g), $"frame section '{name}'", name);
+                    ApiCallResult? dims = _api.FirstAvailable(getters, $"frame section '{name}'", name);
                     if (dims != null)
                     {
                         s.Material = Text(dims, "MatProp") ?? string.Empty;
@@ -217,7 +217,7 @@ namespace EtabsBridge.Core.Services
                 if (r != null)
                 {
                     s.ShellType = Text(r, "ShellType") ?? string.Empty;
-                    s.Material = Text(r, "MatProp") ?? Text(r, "DeckMatProp") ?? string.Empty;
+                    s.Material = Text(r, "MatProp") ?? string.Empty;
                     s.Thickness = Number(r, "Thickness");
                     s.Color = ColorOf(r, "color");
                 }

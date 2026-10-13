@@ -17,6 +17,8 @@ import {
 import type { Project } from "../state/projectStore";
 import { downloadText, parseProjectFile, pickTextFile } from "../state/projectStore";
 import { BarChartH, compact } from "./charts";
+import { CurrencyPicker } from "./CurrencyPicker";
+import { moneyFormat } from "../lib/currency";
 import { DataTable, type Column } from "./DataTable";
 
 interface Props {
@@ -63,7 +65,7 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
     return { concrete: sum("Concrete"), formwork: sum("Formwork"), rebar: sum("Reinforcement") / 1000, steel: sum("Structural steel") };
   }, [lines]);
 
-  const money = (n: number) => `${table.currency} ${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const money = moneyFormat(table.currency);
   const setRate = (key: string, value: number) =>
     update((p) => ({ ...p, rateTable: { ...table, rates: { ...table.rates, [key]: value }, isSample: false } }));
 
@@ -87,7 +89,7 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
     <div className="pad boq">
       {table.isSample && (
         <p className="warn banner flush" role="note">
-          Rates are <strong>samples</strong> (INR) so the screen is not empty. Edit them below or import your rate sheet before using any amount.
+          Rates are <strong>samples</strong> (indicative INR prices{table.currency !== "INR" ? `, labelled ${table.currency} without conversion` : ""}) so the screen is not empty. Edit them below or import your rate sheet before using any amount.
         </p>
       )}
       {message && (
@@ -104,7 +106,7 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
       )}
 
       <div className="tiles">
-        <Tile label={`Total cost (${table.currency})`} value={compact(summary.total)} />
+        <Tile label={`Total cost (${table.currency})`} value={money.compact(summary.total)} />
         <Tile label="Concrete (m³)" value={compact(totals.concrete)} />
         <Tile label="Formwork (m²)" value={compact(totals.formwork)} />
         <Tile label="Reinforcement (t)" value={compact(totals.rebar)} />
@@ -160,7 +162,7 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
         <section className="card pad-sm">
           <h2>Cost by story</h2>
           {storyCost.length ? (
-            <BarChartH data={storyCost} format={(v) => compact(v)} ariaLabel={`Cost by story in ${table.currency}`} />
+            <BarChartH data={storyCost} format={(v) => money.compact(v)} ariaLabel={`Cost by story in ${table.currency}`} />
           ) : (
             <p className="muted">Nothing priced yet.</p>
           )}
@@ -168,19 +170,14 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
 
         <section className="card pad-sm">
           <h2>Rates</h2>
-          <label className="inline">
-            Currency{" "}
-            <input
-              className="short"
-              value={table.currency}
-              maxLength={3}
-              onChange={(e) => {
-                const c = e.target.value.toUpperCase();
-                if (/^[A-Z]{0,3}$/.test(c) && c.length === 3) update((p) => ({ ...p, rateTable: { ...table, currency: c, isSample: false } }));
-              }}
-              aria-label="Currency code"
-            />
-          </label>
+          <CurrencyPicker
+            key={table.currency}
+            value={table.currency}
+            onChange={(currency) =>
+              // Relabel only: rates are not converted, so sample rates stay flagged as samples.
+              update((p) => ({ ...p, rateTable: { ...table, currency } }))
+            }
+          />
           <table className="compact">
             <thead>
               <tr>
@@ -251,7 +248,7 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
       <h2>Bill of quantities</h2>
       <DataTable rows={priced} rowKey={(l) => l.code} columns={columns} />
       <p className="total-line">
-        Total: <strong>{money(summary.total)}</strong>
+        Total: <strong>{money.full(summary.total)}</strong>
         {table.isSample && <span className="muted"> (sample rates)</span>}
       </p>
 

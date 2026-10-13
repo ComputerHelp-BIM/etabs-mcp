@@ -19,3 +19,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Reference copy of ETABSv1.dll fetched by scripts/fetch-etabs-api.sh (never commit CSI binaries)
+.etabs-api/

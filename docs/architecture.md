@@ -77,10 +77,16 @@ Core therefore contains a small, strict, tested JSON reader/writer, and the plug
 check against DNS rebinding, a body size limit, and a write opt-in. The token reaches the web app in the URL
 *fragment*, which browsers never send to the web server, and the app removes it from the address bar immediately.
 
+**Deployable builds use the signed ETABS API (0.6.1).** The real `ETABSv1.dll` is strong-named (CSI public key
+token `453d728ef24c6f5e`); a plugin compiled against an unsigned look-alike would compile but not load in ETABS.
+`EtabsApi.targets` therefore rejects any non-stub build whose `ETABSv1` lacks that token. CI compiles against a
+SHA-256-pinned reference copy (or the installed ETABS on a self-hosted runner) and `ApiContractCheck` verifies every
+by-name API call against its metadata. See [ci-cd.md](ci-cd.md).
+
 **Contract drift is a test failure.** C# writes `contract/fixtures/*.json`. The C# tests require byte-identical output and
 the TypeScript tests validate the same files with the zod schemas.
 
-## Known limits (v0.6.0)
+## Known limits (v0.6.1)
 
 - Results cover base reactions, drifts, joint reactions/displacements, frame forces and concrete design; modal,
   response-spectrum detail, shell stresses and steel design are reachable through `/tables` and `/rpc`.

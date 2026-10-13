@@ -5,6 +5,9 @@
  *   npm run mock                      # port 52780, random token, registered for MCP discovery
  *   MOCK_TOKEN=dev-token-0123456789 npm run mock
  *   node dist/main.js --port 52790 --stories 12 --bays-x 6 --bays-y 4 --latency 300 --allow-writes
+ *
+ * Prints connection links for the hosted web app (https://etabs-bridge.vercel.app) and the local
+ * dev server, or only for --web-app / MOCK_WEB_APP when given.
  */
 import { parseArgs } from "node:util";
 import { startMockBridge } from "./server.js";
@@ -19,7 +22,7 @@ const { values } = parseArgs({
     latency: { type: "string", default: "0" },
     "allow-writes": { type: "boolean", default: false },
     "no-register": { type: "boolean", default: false },
-    "web-app": { type: "string", default: process.env.MOCK_WEB_APP ?? "http://localhost:5173/" },
+    "web-app": { type: "string", default: process.env.MOCK_WEB_APP },
     "allow-origin": { type: "string", multiple: true },
   },
 });
@@ -47,12 +50,13 @@ const bridge = await startMockBridge({
   },
 });
 
-const link = `${values["web-app"]}#bridgeUrl=${encodeURIComponent(bridge.url)}&token=${encodeURIComponent(bridge.token)}`;
+const webApps = values["web-app"] ? [values["web-app"]] : ["https://etabs-bridge.vercel.app/", "http://localhost:5173/"];
+const fragment = `#bridgeUrl=${encodeURIComponent(bridge.url)}&token=${encodeURIComponent(bridge.token)}`;
 const g = bridge.model.geometry;
 console.log(`Mock ETABS Bridge listening on ${bridge.url}`);
 console.log(`  model : ${g.model.fileName} - ${g.stories.length} stories, ${g.joints.length} joints, ${g.frames.length} frames, ${g.areas.length} areas`);
 console.log(`  token : ${bridge.token}`);
-console.log(`  web   : ${link}`);
+for (const app of webApps) console.log(`  web   : ${app}${fragment}`);
 console.log(`  writes: ${values["allow-writes"] ? "ENABLED" : "disabled"}  |  Ctrl+C to stop`);
 
 const shutdown = () => {

@@ -83,7 +83,13 @@ export function explain(err: unknown): string {
   if (err instanceof BridgeError) {
     switch (err.code) {
       case "NETWORK":
-        return "Cannot reach the bridge. Is the ETABS Bridge window open, and is the port right?";
+        return globalThis.location?.protocol === "https:"
+          ? // Hosted page -> http://localhost: the browser may ask before allowing it (Chrome/Edge "local network access"),
+            // and a blocked CORS origin also surfaces as a network error.
+            "Cannot reach the bridge. Is the ETABS Bridge window open, and is the port right? If your browser asked to allow " +
+              "access to devices on your local network, choose Allow (or allow it in the site settings next to the address bar). " +
+              `Also check that ${globalThis.location.origin} is listed in allowedOrigins in %APPDATA%\\EtabsBridge\\settings.json.`
+          : "Cannot reach the bridge. Is the ETABS Bridge window open, and is the port right?";
       case "UNAUTHORIZED":
         return "The token was rejected. Each ETABS session has a new token; copy it again from the ETABS Bridge window.";
       case "FORBIDDEN_ORIGIN":

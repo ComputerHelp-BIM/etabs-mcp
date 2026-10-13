@@ -72,7 +72,7 @@ namespace EtabsBridge.Core.Services
                 double[] fy = LateBoundApi.Numbers(r, "Fy");
                 double[] fz = LateBoundApi.Numbers(r, "Fz");
                 double[] mx = LateBoundApi.Numbers(r, "Mx");
-                double[] my = First(LateBoundApi.Numbers(r, "ParamMy"), LateBoundApi.Numbers(r, "My"));
+                double[] my = LateBoundApi.Numbers(r, "ParamMy"); // CSI names the My output "ParamMy"
                 double[] mz = LateBoundApi.Numbers(r, "Mz");
                 int n = LateBoundApi.Count(cases, stepType, stepNum, fx, fy, fz, mx, my, mz);
                 return Enumerable.Range(0, n)
@@ -301,7 +301,5 @@ namespace EtabsBridge.Core.Services
         }
 
         private UnitsInfo Units() => EtabsConventions.ParseUnits(_model.GetModelInfo().UnitsName);
-
-        private static double[] First(double[] a, double[] b) => a.Length > 0 ? a : b;
     }
 }

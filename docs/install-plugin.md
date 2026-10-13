@@ -6,7 +6,21 @@
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0). It builds both the `net48` and the `net8.0-windows` plugin.
 - Visual Studio 2022 is optional; the `dotnet` CLI is enough.
 
-## Build
+## Download a build (easiest)
+
+1. Get `EtabsBridgePlugin-x.y.z.zip` from the latest
+   [GitHub Release](https://github.com/ComputerHelp-BIM/etabs-mcp/releases), or from the newest
+   [Plugin workflow run](https://github.com/ComputerHelp-BIM/etabs-mcp/actions/workflows/plugin.yml) on `dev`
+   (*Artifacts*, kept 30 days).
+2. **Unblock it before extracting:** right-click the zip → Properties → tick **Unblock** → OK. Windows marks
+   downloaded files, and .NET may refuse to load a blocked plugin DLL.
+3. Extract it to a permanent folder (ETABS loads the DLL from there every time), then continue with
+   [Which framework folder?](#which-framework-folder) and [Register in ETABS](#register-in-etabs-once-per-user).
+
+These builds are compiled against CSI's signed ETABS API (see [ci-cd.md](ci-cd.md)); `README.txt` in the zip records
+exactly how each one was built.
+
+## Build it yourself
 
 ```powershell
 cd plugin
@@ -54,31 +68,40 @@ framework because your `ETABSv1.dll` targets only the other, that tells you whic
 ```json
 {
   "preferredPort": 52780,
-  "allowedOrigins": ["http://localhost:5173", "http://127.0.0.1:5173"],
-  "webAppUrl": "http://localhost:5173/",
+  "allowedOrigins": [
+    "https://etabs-bridge.vercel.app",
+    "https://etabs-bridge-*-computer-help.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+  ],
+  "webAppUrl": "https://etabs-bridge.vercel.app/",
   "callTimeoutSeconds": 120
 }
 ```
 
-- Add your production web app's origin to `allowedOrigins` (exact scheme+host+port, e.g. `"https://app.example.com"`).
-  For Vercel preview URLs use a host wildcard such as `"https://my-app-*.vercel.app"`; see [deploy-vercel.md](deploy-vercel.md).
-  `"*"` allows any origin; the token is still required.
+- **Open web app** opens the hosted app at https://etabs-bridge.vercel.app ([deploy-vercel.md](deploy-vercel.md)).
+  For local development set `webAppUrl` to `http://localhost:5173/`.
+- To use another web app, add its origin to `allowedOrigins` (exact scheme+host+port, e.g. `"https://app.example.com"`,
+  or a host wildcard such as `"https://my-app-*.vercel.app"`). `"*"` allows any origin; the token is still required.
+- An existing file is never overwritten: files created by 0.6.0 or older still point at `localhost:5173`. Delete the
+  file (or edit it) to pick up the hosted defaults.
 - Invalid values are reported in the plugin's log and replaced by defaults.
 
 ## First-run checklist (please report results)
 
-These points could not be verified without ETABS and are the most likely to need a small fix:
+Since 0.6.1, CI compiles the plugin against CSI's signed ETABS API (v1, from a pinned reference copy) and checks
+every by-name call against it, so items 1 and 2 already pass there. The rest can only be checked inside ETABS:
 
 | # | Check | If it fails |
 | --- | --- | --- |
-| 1 | The build compiles against your real `ETABSv1.dll` | A signature differs from the stub in `plugin/stubs`; the compiler names the member. Fix `EtabsApiModel.cs` (and the stub) |
-| 2 | `cPlugin` implements `cPluginContract` | If your `ETABSv1.dll` has no `cPluginContract`, remove `: cPluginContract` from `cPlugin.cs` |
+| 1 | The build compiles against **your** `ETABSv1.dll` (only if you build it yourself) | Verified in CI against API v1. If your version differs, the compiler names the member; fix `EtabsApiModel.cs` (and the stub) |
+| 2 | `cPlugin` implements `cPluginContract` | Verified in CI: the API v1 contract has `Main(ref cSapModel, ref cPluginCallback)` and `Info(ref string)` |
 | 3 | ETABS loads the DLL from the framework folder you picked | Try the other framework folder |
 | 4 | While the window is open, is the ETABS UI usable or locked? | Both are acceptable for reading; tell us which, because it decides how live editing will work |
 | 5 | `GET /api/v1/geometry` returns your stories, frames and areas | Send the error message: it names the failing API call and return code |
-| 5d | After analysis: `GET /api/v1/results/status`, then `/results/base-reactions?cases=Dead` | Send the `warnings`; they name any results getter that differs |
-| 5c | `GET /api/v1/loads` lists your patterns, combinations and assigned loads | Send the `warnings` array |
 | 5b | `GET /api/v1/sections` lists your materials and sections with dimensions | Send the `warnings` array: each line names the getter that is missing or failed |
+| 5c | `GET /api/v1/loads` lists your patterns, combinations and assigned loads | Send the `warnings` array |
+| 5d | After analysis: `GET /api/v1/results/status`, then `/results/base-reactions?cases=Dead` | Send the `warnings`; they name any results getter that differs |
 | 6 | Port binding works without "Run as administrator" | Send the plugin log line; an http.sys URL ACL may be needed |
 
 ## Troubleshooting

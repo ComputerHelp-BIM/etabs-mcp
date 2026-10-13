@@ -32,7 +32,7 @@ import {
 import { ConnectionError, type ConnectionResolver } from "./connection.js";
 
 export const SERVER_NAME = "etabs-bridge";
-export const SERVER_VERSION = "0.6.0";
+export const SERVER_VERSION = "0.6.1";
 
 export interface ServerOptions {
   resolver: ConnectionResolver;

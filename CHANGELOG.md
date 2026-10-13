@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-10-13
+
+### Added
+
+- **Hosted web app** at https://etabs-bridge.vercel.app (Vercel project `etabs-bridge`; production follows `dev`).
+- **Plugin CI/CD** (`.github/workflows/plugin.yml`): builds the plugin on Windows against CSI's signed ETABS API,
+  runs the C# tests on Windows, packages `EtabsBridgePlugin-<version>.zip` (both frameworks, symbols, README with
+  build provenance, SHA-256 sums) as an artifact, and publishes a GitHub Release for `v*` tags. A self-hosted runner
+  with ETABS can be switched on with repository variables. See `docs/ci-cd.md`.
+- **ETABS API contract check** (`scripts/check-etabs-api.sh`, `plugin/tools/ApiContractCheck`): every by-name API
+  call (59 method paths, 123 output names) is checked against the real `ETABSv1.dll` metadata.
+- `scripts/fetch-etabs-api.sh`: a SHA-256-pinned reference copy of `ETABSv1.dll` for builds without ETABS.
+- **Currency picker** in BOQ & Cost: INR (default) plus USD, EUR, JPY, GBP, CNY, AUD, CAD, CHF, HKD, SGD, or any
+  ISO code; amounts use the currency's digit grouping (lakh/crore for INR).
+- The mock bridge prints a link for the hosted app and allows its origins.
+
+### Changed
+
+- Plugin defaults: **Open web app** opens the hosted app; `allowedOrigins` includes it and its preview deployments.
+  Existing `settings.json` files are left as they are.
+- Builds against a real `ETABSv1.dll` now fail unless it carries CSI's strong name (public key token
+  `453d728ef24c6f5e`), so a plugin that ETABS cannot load is never produced.
+- CI also runs on pushes to `dev`.
+- Connection errors on the hosted app explain the browser's local-network permission and `allowedOrigins`.
+
+### Fixed
+
+- Changing the BOQ currency no longer clears the "sample rates" flag (the numbers are still INR samples).
+- Removed two unverified fallback output names (`My`, `DeckMatProp`) that do not exist in the ETABS API.
+- `README.md` described version 0.2.0.
+
 ## [0.6.0] - 2026-10-13
 
 ### Added

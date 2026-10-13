@@ -23,6 +23,28 @@
   </Target>
 
   <Target Name="CheckEtabsDll" BeforeTargets="ResolveAssemblyReferences" Condition="'$(UseEtabsStub)' != 'true' And !Exists('$(EtabsInstallDir)\ETABSv1.dll')">
-    <Error Text="ETABSv1.dll not found in '$(EtabsInstallDir)'. Pass -p:EtabsInstallDir=&lt;your ETABS folder&gt;, or -p:UseEtabsStub=true for a type-check-only build." />
+    <Error Text="ETABSv1.dll not found in '$(EtabsInstallDir)'. Pass -p:EtabsInstallDir=&lt;your ETABS folder&gt; (or run scripts/fetch-etabs-api.sh and pass its folder), or -p:UseEtabsStub=true for a type-check-only build." />
+  </Target>
+
+  <!--
+    A deployable plugin must reference the SIGNED ETABSv1 (CSI's strong name), exactly as ETABS
+    loads it. An unsigned look-alike (such as the stub) compiles fine but makes ETABS fail to bind
+    the plugin at run time, so it is rejected here.
+  -->
+  <PropertyGroup>
+    <EtabsApiPublicKeyToken Condition="'$(EtabsApiPublicKeyToken)' == ''">453d728ef24c6f5e</EtabsApiPublicKeyToken>
+  </PropertyGroup>
+
+  <Target Name="CheckEtabsApiIdentity" AfterTargets="ResolveAssemblyReferences" Condition="'$(UseEtabsStub)' != 'true'">
+    <ItemGroup>
+      <_EtabsApiReference Include="@(ReferencePath)" Condition="'%(Filename)' == 'ETABSv1'" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_EtabsApiFusionName>@(_EtabsApiReference->'%(FusionName)')</_EtabsApiFusionName>
+    </PropertyGroup>
+    <Error Condition="'$(_EtabsApiFusionName)' == ''" Text="ETABSv1 was not resolved from '$(EtabsInstallDir)'." />
+    <Error Condition="'$(_EtabsApiFusionName)' != '' And !$(_EtabsApiFusionName.ToLowerInvariant().Contains('publickeytoken=$(EtabsApiPublicKeyToken)'))"
+           Text="'$(EtabsInstallDir)\ETABSv1.dll' is '$(_EtabsApiFusionName)', not CSI's signed ETABS API (PublicKeyToken=$(EtabsApiPublicKeyToken)). A plugin built against it would not load in ETABS." />
+    <Message Importance="high" Text="$(MSBuildProjectName): ETABS API reference $(_EtabsApiFusionName)" />
   </Target>
 </Project>

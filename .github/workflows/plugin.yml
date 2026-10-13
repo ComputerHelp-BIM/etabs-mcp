@@ -1,0 +1,174 @@
+name: Plugin
+
+# Builds the ETABS plugin against the real, signed ETABS API, verifies it and packages it.
+#   - push to dev/main, pull requests, manual runs: build + checks + downloadable artifact (30 days)
+#   - tag vMAJOR.MINOR.PATCH (must equal /VERSION): additionally publishes a GitHub Release
+# ETABS API source (see docs/ci-cd.md):
+#   - default: the pinned reference copy from scripts/fetch-etabs-api.sh on a GitHub-hosted runner
+#   - repository variable ETABS_RUNNER_LABEL set: a self-hosted Windows runner with ETABS installed,
+#     using the ETABSv1.dll in ETABS_INSTALL_DIR (never for pull requests)
+
+on:
+  push:
+    branches: [dev, main]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    name: Build ETABS plugin
+    # Pull-request code is untrusted and must never run on a self-hosted machine with ETABS.
+    runs-on: ${{ (github.event_name != 'pull_request' && vars.ETABS_RUNNER_LABEL != '') && fromJSON(format('["self-hosted","windows","{0}"]', vars.ETABS_RUNNER_LABEL)) || 'windows-latest' }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Read version (a release tag must equal /VERSION)
+        id: version
+        run: |
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::VERSION '$VERSION' is not MAJOR.MINOR.PATCH"; exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $VERSION (expected v$VERSION)"; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Locate the ETABS API (ETABSv1.dll)
+        id: api
+        env:
+          ETABS_INSTALL_DIR: ${{ vars.ETABS_INSTALL_DIR }}
+          RUNNER_KIND: ${{ runner.environment }}
+        run: |
+          native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
+          posix()  { if command -v cygpath >/dev/null 2>&1; then cygpath -u "$1"; else printf '%s' "$1"; fi; }
+          if [[ "$RUNNER_KIND" == "self-hosted" && -n "$ETABS_INSTALL_DIR" ]]; then
+            DIR="$ETABS_INSTALL_DIR"
+            SOURCE="ETABSv1.dll from the ETABS installation on the self-hosted build machine ($ETABS_INSTALL_DIR)"
+          else
+            scripts/fetch-etabs-api.sh .etabs-api
+            DIR="$(native "$PWD/.etabs-api")"
+            SOURCE="ETABSv1.dll reference copy from $(cut -d' ' -f1-2 .etabs-api/.package) on nuget.org (unofficial redistribution, SHA-256 pinned); used to compile only, not included"
+          fi
+          if [[ ! -f "$(posix "$DIR")/ETABSv1.dll" ]]; then
+            echo "::error::ETABSv1.dll not found in $DIR"; exit 1
+          fi
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "ETABS API: $SOURCE"
+
+      - name: Check late-bound API calls against the real ETABS API
+        env:
+          API_DIR: ${{ steps.api.outputs.dir }}
+        run: scripts/check-etabs-api.sh "$API_DIR/ETABSv1.dll"
+
+      - name: Core tests on Windows (real http.sys sockets)
+        run: dotnet test plugin/tests/EtabsBridge.Core.Tests --configuration Release
+
+      - name: Build plugin (net48 + net8.0-windows) against the signed ETABS API
+        env:
+          API_DIR: ${{ steps.api.outputs.dir }}
+        run: >-
+          dotnet build plugin/src/EtabsBridgePlugin --configuration Release
+          "-p:EtabsInstallDir=$API_DIR" -p:ContinuousIntegrationBuild=true
+
+      - name: Package
+        shell: powershell
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PROVENANCE: "Built by GitHub Actions run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} from commit ${{ github.sha }}. ${{ steps.api.outputs.source }}."
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = "EtabsBridgePlugin-$env:VERSION"
+          $stage = Join-Path $env:RUNNER_TEMP $name
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          foreach ($fw in 'net48', 'net8.0-windows') {
+            $src = "plugin/src/EtabsBridgePlugin/bin/Release/$fw"
+            $dst = New-Item -ItemType Directory -Path (Join-Path $stage $fw) -Force
+            Copy-Item "$src/EtabsBridgePlugin.dll", "$src/EtabsBridgePlugin.pdb" -Destination $dst
+          }
+          $readme = (Get-Content plugin/packaging/README.txt -Raw).Replace('{VERSION}', $env:VERSION).Replace('{PROVENANCE}', $env:PROVENANCE)
+          Set-Content -Path (Join-Path $stage 'README.txt') -Value $readme -Encoding UTF8
+          $sums = Get-ChildItem $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+          }
+          Set-Content -Path (Join-Path $stage 'SHA256SUMS.txt') -Value $sums -Encoding ASCII
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/$name.zip" -Force
+          ('{0}  {1}.zip' -f (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower(), $name) | Set-Content "dist/$name.zip.sha256" -Encoding ASCII
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EtabsBridgePlugin-${{ steps.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: EtabsBridgePlugin-${{ needs.build.outputs.version }}
+          path: dist
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            /^## \[/ { if (found) exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [[ ! -s notes.md ]]; then echo "::error::CHANGELOG.md has no section for [$VERSION]"; exit 1; fi
+          {
+            echo
+            echo "### Install"
+            echo
+            echo "Download \`EtabsBridgePlugin-$VERSION.zip\`, unblock it (right-click > Properties > Unblock), extract, then register the DLL for your ETABS framework in **Tools > Add/Show Plugins** (plugin name \`EtabsBridgePlugin\`). Details: \`README.txt\` in the zip and [docs/install-plugin.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/install-plugin.md)."
+            echo
+            echo "Web app: https://etabs-bridge.vercel.app"
+          } >> notes.md
+
+      - name: Publish (or update) the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=()
+          if [[ "$VERSION" == 0.* ]]; then PRERELEASE=(--prerelease); fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag "${PRERELEASE[@]}" \
+              --title "ETABS Bridge $VERSION" --notes-file notes.md
+          fi

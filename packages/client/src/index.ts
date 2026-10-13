@@ -10,4 +10,4 @@ export * from "./loads.js";
 export * from "./results.js";
 
 /** Semantic version of this client package; kept equal to /VERSION. */
-export const CLIENT_VERSION = "0.6.0";
+export const CLIENT_VERSION = "0.6.1";

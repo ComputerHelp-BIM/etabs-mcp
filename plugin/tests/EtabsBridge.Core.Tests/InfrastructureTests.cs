@@ -125,7 +125,20 @@ namespace EtabsBridge.Core.Tests
             Assert.True(File.Exists(path));
             JsonValue saved = JsonParser.Parse(File.ReadAllText(path));
             Assert.Equal(52780, saved.GetInt64("preferredPort"));
-            Assert.Equal("http://localhost:5173/", saved.GetString("webAppUrl"));
+            Assert.Equal("https://etabs-bridge.vercel.app/", saved.GetString("webAppUrl"));
+        }
+
+        [Theory]
+        [InlineData("https://etabs-bridge.vercel.app", true)]
+        [InlineData("https://etabs-bridge-git-dev-computer-help.vercel.app", true)] // branch preview
+        [InlineData("https://etabs-bridge-bqg96kw0v-computer-help.vercel.app", true)] // deployment preview
+        [InlineData("http://localhost:5173", true)]
+        [InlineData("https://etabs-bridge-x-other-team.vercel.app", false)]
+        [InlineData("https://etabs-bridge.vercel.app.evil.com", false)]
+        [InlineData("http://etabs-bridge.vercel.app", false)]
+        public void DefaultOriginsAllowTheHostedWebApp(string origin, bool expected)
+        {
+            Assert.Equal(expected, new EtabsBridge.Core.Http.OriginMatcher(new BridgeSettings().AllowedOrigins).IsAllowed(origin));
         }
 
         [Fact]

@@ -1,6 +1,6 @@
 {
   "name": "@etabs-bridge/web",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "Sample web app: connects to the ETABS Bridge plugin and shows the model in 3D with data tables.",
   "type": "module",
@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@etabs-bridge/client": "0.6.0",
+    "@etabs-bridge/client": "0.6.1",
     "@react-three/drei": "^10.7.0",
     "@react-three/fiber": "^9.4.0",
     "react": "~19.2.0",
@@ -26,6 +26,6 @@
     "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^5.0.0",
     "vite": "^7.1.0",
-    "@etabs-bridge/mock-bridge": "0.6.0"
+    "@etabs-bridge/mock-bridge": "0.6.1"
   }
 }

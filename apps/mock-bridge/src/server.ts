@@ -55,6 +55,9 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
   const token = options.token ?? randomBytes(32).toString("base64url");
   if (token.length < 16) throw new Error("token must be at least 16 characters");
   const allowedOrigins = options.allowedOrigins ?? [
+    // Same defaults as the plugin, so the hosted web app can be tried against the mock.
+    "https://etabs-bridge.vercel.app",
+    "https://etabs-bridge-*-computer-help.vercel.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:4173",

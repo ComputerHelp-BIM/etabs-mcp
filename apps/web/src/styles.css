@@ -763,6 +763,27 @@ input.short {
   margin-bottom: 0.5rem;
 }
 
+.currency-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.currency-picker .inline {
+  margin-bottom: 0;
+}
+
+.currency-picker select {
+  max-width: 100%;
+}
+
+.currency-picker p {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+}
+
 .inline-fields {
   display: flex;
   flex-wrap: wrap;

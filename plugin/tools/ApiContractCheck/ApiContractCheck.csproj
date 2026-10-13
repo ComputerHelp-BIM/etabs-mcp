@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Build-time check of the late-bound CSI API calls in EtabsBridge.Core against a real ETABSv1.dll.
+
+    The section, load and result readers call ETABS getters BY NAME (LateBoundApi), so the compiler
+    cannot catch a misspelt method or output name; at run time it would only show up as a warning
+    and null values. This tool reads the real API's metadata (nothing in ETABSv1.dll is executed)
+    and fails if any method path or output parameter name used in the sources does not exist.
+
+      Usage: see scripts/check-etabs-api.sh (arguments: path to ETABSv1.dll, then source folders).
+
+    Developer/CI tool only: never loaded into ETABS, so a NuGet dependency is fine here.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.1" />
+  </ItemGroup>
+
+</Project>

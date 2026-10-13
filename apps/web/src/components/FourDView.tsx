@@ -22,7 +22,8 @@ import {
 } from "@etabs-bridge/client";
 import type { Project } from "../state/projectStore";
 import { downloadText, pickTextFile } from "../state/projectStore";
-import { GanttChart, LineChart, compact } from "./charts";
+import { GanttChart, LineChart } from "./charts";
+import { DEFAULT_CURRENCY, moneyFormat } from "../lib/currency";
 import type { Selection } from "./ModelViewer";
 
 const ModelViewer = lazy(() => import("./ModelViewer").then((m) => ({ default: m.ModelViewer })));
@@ -80,6 +81,8 @@ export function FourDView({ geometry, sections, elements, project, update }: Pro
     [elements, project.quantitySettings, project.rateTable],
   );
   const costs = useMemo(() => (elements && rateTable ? taskCosts(tasks, elements, rateTable) : null), [tasks, elements, rateTable]);
+  const currency = rateTable?.currency ?? DEFAULT_CURRENCY;
+  const money = moneyFormat(currency);
   const curve = useMemo(() => (costs ? costCurve(tasks, costs, settings) : []), [tasks, costs, settings]);
   const costToDate = current !== null ? (curve.filter((p) => p.t <= current - DAY).pop()?.cumulative ?? 0) : 0;
   const totalCost = curve[curve.length - 1]?.cumulative ?? 0;
@@ -166,7 +169,7 @@ export function FourDView({ geometry, sections, elements, project, update }: Pro
           )}
           {costs && (
             <span>
-              Planned cost to date: <strong>{rateTable?.currency} {compact(costToDate)}</strong> of {compact(totalCost)}
+              Planned cost to date: <strong>{currency} {money.compact(costToDate)}</strong> of {money.compact(totalCost)}
               {rateTable?.isSample && <span className="muted"> (sample rates)</span>}
             </span>
           )}
@@ -227,7 +230,7 @@ export function FourDView({ geometry, sections, elements, project, update }: Pro
               series: t.phase === "Vertical" ? 0 : 1,
               start: parseIso(t.start),
               finish: parseIso(t.finish),
-              detail: `${t.start} → ${t.finish} · ${t.durationDays} working days · ${t.elements.length} objects${costs ? ` · ${rateTable?.currency} ${compact(costs.get(t.id) ?? 0)}` : ""}`,
+              detail: `${t.start} → ${t.finish} · ${t.durationDays} working days · ${t.elements.length} objects${costs ? ` · ${money.full(costs.get(t.id) ?? 0)}` : ""}`,
             }))}
             seriesNames={["Columns & walls", "Beams & slab"]}
             marker={current}
@@ -239,11 +242,11 @@ export function FourDView({ geometry, sections, elements, project, update }: Pro
 
       {curve.length > 1 && (
         <section className="card pad-sm">
-          <h2>Planned cost (S-curve, {rateTable?.currency})</h2>
+          <h2>Planned cost (S-curve, {currency})</h2>
           <LineChart
             series={[{ name: "Cumulative planned cost", points: curve.map((p) => ({ x: p.t, y: p.cumulative })) }]}
             formatX={fmtDate}
-            formatY={(v) => compact(v)}
+            formatY={(v) => money.compact(v)}
             area
             marker={current}
             ariaLabel="Cumulative planned cost over time"
@@ -261,7 +264,7 @@ export function FourDView({ geometry, sections, elements, project, update }: Pro
               <th>Finish</th>
               <th className="num">Working days</th>
               <th className="num">Objects</th>
-              {costs && <th className="num">Cost ({rateTable?.currency})</th>}
+              {costs && <th className="num">Cost ({currency})</th>}
             </tr>
           </thead>
           <tbody>
@@ -279,7 +282,7 @@ export function FourDView({ geometry, sections, elements, project, update }: Pro
                 </td>
                 <td className="num">{t.durationDays}</td>
                 <td className="num">{t.elements.length}</td>
-                {costs && <td className="num">{Math.round(costs.get(t.id) ?? 0).toLocaleString()}</td>}
+                {costs && <td className="num">{money.amount(costs.get(t.id) ?? 0)}</td>}
               </tr>
             ))}
           </tbody>
