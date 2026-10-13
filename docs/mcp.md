@@ -44,6 +44,7 @@ Tokens never appear in tool output.
 | `etabs_get_geometry_summary` | Counts by type/story, sections in use, supports, bounding box (best first call) |
 | `etabs_get_stories`, `etabs_get_grids` | Levels and grid lines |
 | `etabs_get_joints`, `etabs_get_frames`, `etabs_get_areas` | Paged (`offset`/`limit`, `nextOffset`), filterable by story/type/section |
+| `etabs_get_sections` | Materials (E, unit weight, f'c, Fy, Fu), frame sections (shape, dimensions, properties) and area sections (slab/wall, thickness); filterable |
 | `etabs_list_tables`, `etabs_get_table` | Any ETABS database table, searchable and paged |
 | `etabs_describe_api`, `etabs_call_api` | The whole CSI API. Writes are refused unless enabled in the plugin window |
 

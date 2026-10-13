@@ -16,6 +16,12 @@ namespace EtabsBridge.Core.Tests.Fakes.FakeApi
 
         IFakeNullObj Broken { get; }
 
+        IFakePropMaterial PropMaterial { get; }
+
+        IFakePropFrame PropFrame { get; }
+
+        IFakePropArea PropArea { get; }
+
         string GetModelFilename(bool IncludePath = true);
 
         int GetVersion(ref string Version, ref double MyVersionNumber);
@@ -50,6 +56,12 @@ namespace EtabsBridge.Core.Tests.Fakes.FakeApi
         public IFakeFrameObj FrameObj => Frames;
 
         public IFakeNullObj Broken => null!;
+
+        public IFakePropMaterial PropMaterial { get; } = new FakePropMaterial();
+
+        public IFakePropFrame PropFrame { get; } = new FakePropFrame();
+
+        public IFakePropArea PropArea { get; } = new FakePropArea();
 
         public string GetModelFilename(bool IncludePath = true) => IncludePath ? @"C:\M\Sample.EDB" : "Sample.EDB";
 

@@ -55,6 +55,7 @@ describe("MCP server against the mock bridge", () => {
         "etabs_get_joints",
         "etabs_get_frames",
         "etabs_get_areas",
+        "etabs_get_sections",
         "etabs_list_tables",
         "etabs_get_table",
         "etabs_describe_api",
@@ -94,6 +95,16 @@ describe("MCP server against the mock bridge", () => {
   it("filters joints and areas", async () => {
     expect((await call(client, "etabs_get_joints", { supportsOnly: true })).json.total).toBe(20);
     expect((await call(client, "etabs_get_areas", { type: "Wall", story: "Story1" })).json.total).toBe(3);
+  });
+
+  it("returns sections and materials, filtered", async () => {
+    const all = await call(client, "etabs_get_sections");
+    expect(all.json.materials.map((m: { name: string }) => m.name)).toContain("C35");
+    expect(all.json.frameSections.length).toBeGreaterThan(0);
+
+    const beams = await call(client, "etabs_get_sections", { include: "frameSections", search: "b300" });
+    expect(beams.json.frameSections.map((s: { name: string }) => s.name)).toEqual(["B300x600", "B300x500"]);
+    expect(beams.json.materials).toBeUndefined();
   });
 
   it("validates tool input", async () => {

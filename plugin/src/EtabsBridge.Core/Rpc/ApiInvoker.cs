@@ -63,6 +63,63 @@ namespace EtabsBridge.Core.Rpc
         /// </summary>
         public ApiCallResult Invoke(string methodPath, JsonValue? args)
         {
+            int supplied = args == null || args.IsNull ? 0
+                : args.Kind == JsonKind.Array ? args.AsArray().Count
+                : args.Kind == JsonKind.Object ? args.AsObject().Count
+                : -1;
+            (object target, MethodInfo method, string fullName) = Resolve(methodPath, supplied);
+            object?[] values = BindArguments(method.GetParameters(), args, fullName);
+            return Execute(target, method, fullName, values);
+        }
+
+        /// <summary>
+        /// Late-bound call for internal readers (e.g. sections/materials): <paramref name="inputs"/> fill the
+        /// method's non-ref parameters in order (CLR values, converted where needed); every ref/out parameter
+        /// starts empty and is returned in <see cref="ApiCallResult.Outputs"/> (keys case-insensitive).
+        /// Binding by name at runtime means an API signature that differs between ETABS versions surfaces
+        /// as a catchable error instead of a compile/load failure.
+        /// </summary>
+        /// <exception cref="BridgeException">404 when the method does not exist; 400 when inputs do not fit.</exception>
+        /// <exception cref="EtabsApiException">The API threw.</exception>
+        public ApiCallResult InvokeWithInputs(string methodPath, params object?[] inputs)
+        {
+            inputs ??= Array.Empty<object?>();
+            (object target, MethodInfo method, string fullName) = Resolve(methodPath, inputs.Length);
+            ParameterInfo[] parameters = method.GetParameters();
+            var values = new object?[parameters.Length];
+            int next = 0;
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                ParameterInfo p = parameters[i];
+                Type type = p.ParameterType.IsByRef ? p.ParameterType.GetElementType()! : p.ParameterType;
+                if (p.ParameterType.IsByRef)
+                {
+                    values[i] = JsonArgumentConverter.EmptyValue(type);
+                }
+                else if (next < inputs.Length)
+                {
+                    values[i] = ConvertClr(inputs[next++], type, p.Name, fullName);
+                }
+                else if (p.IsOptional)
+                {
+                    values[i] = p.DefaultValue is DBNull || p.DefaultValue == Missing.Value ? JsonArgumentConverter.EmptyValue(type) : p.DefaultValue;
+                }
+                else
+                {
+                    throw BadRequest($"Missing required argument '{p.Name}' for '{fullName}'.");
+                }
+            }
+
+            if (next < inputs.Length)
+            {
+                throw BadRequest($"'{fullName}' takes {next} input arguments but {inputs.Length} were given.");
+            }
+
+            return Execute(target, method, fullName, values);
+        }
+
+        private (object Target, MethodInfo Method, string FullName) Resolve(string methodPath, int suppliedArgs)
+        {
             string[] segments = SplitPath(methodPath);
             if (segments.Length == 0)
             {
@@ -73,7 +130,7 @@ namespace EtabsBridge.Core.Rpc
             (object target, Type targetType, string objectPath) = ResolveObject(segments.Take(segments.Length - 1).ToArray());
             string fullName = objectPath.Length == 0 ? methodName : objectPath + "." + methodName;
 
-            MethodInfo method = SelectMethod(targetType, methodName, args, fullName);
+            MethodInfo method = SelectMethod(targetType, methodName, suppliedArgs, fullName);
 
             if (!RpcPolicy.IsReadOnly(method.Name) && !_writesEnabled())
             {
@@ -83,9 +140,11 @@ namespace EtabsBridge.Core.Rpc
                     $"'{fullName}' may modify the model. Enable \"Allow write operations\" in the ETABS Bridge window to call it.");
             }
 
-            ParameterInfo[] parameters = method.GetParameters();
-            object?[] values = BindArguments(parameters, args, fullName);
+            return (target, method, fullName);
+        }
 
+        private static ApiCallResult Execute(object target, MethodInfo method, string fullName, object?[] values)
+        {
             object? returnValue;
             try
             {
@@ -96,7 +155,8 @@ namespace EtabsBridge.Core.Rpc
                 throw new EtabsApiException(fullName, ex.InnerException.Message, ex.InnerException);
             }
 
-            var outputs = new Dictionary<string, object?>(StringComparer.Ordinal);
+            ParameterInfo[] parameters = method.GetParameters();
+            var outputs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < parameters.Length; i++)
             {
                 if (parameters[i].ParameterType.IsByRef)
@@ -111,6 +171,28 @@ namespace EtabsBridge.Core.Rpc
                 ReturnValue = method.ReturnType == typeof(void) ? null : returnValue,
                 Outputs = outputs,
             };
+        }
+
+        private static object? ConvertClr(object? value, Type type, string? name, string fullName)
+        {
+            if (value == null || type.IsInstanceOfType(value))
+            {
+                return value;
+            }
+
+            try
+            {
+                if (type.IsEnum)
+                {
+                    return value is string s ? Enum.Parse(type, s, true) : Enum.ToObject(type, value);
+                }
+
+                return System.Convert.ChangeType(value, type, CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is InvalidCastException || ex is FormatException || ex is OverflowException || ex is ArgumentException)
+            {
+                throw BadRequest($"Argument '{name}' of '{fullName}': cannot convert {value.GetType().Name} to {ApiReflection.FriendlyName(type)}.");
+            }
         }
 
         private static string[] SplitPath(string? path)
@@ -162,7 +244,7 @@ namespace EtabsBridge.Core.Rpc
             return (current, currentType, string.Join(".", walked));
         }
 
-        private static MethodInfo SelectMethod(Type type, string name, JsonValue? args, string fullName)
+        private static MethodInfo SelectMethod(Type type, string name, int supplied, string fullName)
         {
             List<MethodInfo> candidates = ApiReflection.GetMethods(type)
                 .Where(m => m.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
@@ -179,10 +261,6 @@ namespace EtabsBridge.Core.Rpc
             }
 
             // Overloads are rare in the CSI API; pick the single one whose arity accepts the arguments.
-            int supplied = args == null || args.IsNull ? 0
-                : args.Kind == JsonKind.Array ? args.AsArray().Count
-                : args.Kind == JsonKind.Object ? args.AsObject().Count
-                : -1;
             List<MethodInfo> matching = candidates.Where(m => m.GetParameters().Length >= supplied).ToList();
             if (matching.Count == 1)
             {
@@ -356,7 +434,10 @@ namespace EtabsBridge.Core.Rpc
             throw new ArgumentException($"parameter type '{ApiReflection.FriendlyName(type)}' is not supported over RPC");
         }
 
-        /// <summary>Initial value for an omitted ref/out parameter: empty string/array, zero, or first enum member.</summary>
+        /// <summary>
+        /// Initial value for an omitted ref/out parameter: empty string/array, zero, or enum value 0
+        /// (CSI uses 0 for "all/none", e.g. GetNameList(..., MatType = 0) lists every material).
+        /// </summary>
         public static object? EmptyValue(Type type)
         {
             if (type == typeof(string))
@@ -371,8 +452,7 @@ namespace EtabsBridge.Core.Rpc
 
             if (type.IsEnum)
             {
-                Array members = Enum.GetValues(type);
-                return members.Length > 0 ? members.GetValue(0) : Activator.CreateInstance(type);
+                return Enum.ToObject(type, 0);
             }
 
             return type.IsValueType ? Activator.CreateInstance(type) : null;

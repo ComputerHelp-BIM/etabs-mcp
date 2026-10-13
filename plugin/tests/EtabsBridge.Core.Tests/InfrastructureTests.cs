@@ -364,3 +364,41 @@ namespace EtabsBridge.Core.Tests
         }
     }
 }
+
+namespace EtabsBridge.Core.Tests
+{
+    public class OriginMatcherTests
+    {
+        [Theory]
+        [InlineData("https://app.example.com", true)]
+        [InlineData("https://APP.example.com/", true)]
+        [InlineData("http://app.example.com", false)] // scheme must match
+        [InlineData("https://etabs-viewer.vercel.app", true)]
+        [InlineData("https://etabs-viewer-git-dev-team.vercel.app", true)]
+        [InlineData("https://a.b.vercel.app", false)] // '*' never spans a dot
+        [InlineData("https://vercel.app", false)]
+        [InlineData("https://evil.com/x.vercel.app", false)]
+        [InlineData("https://x.vercel.app.evil.com", false)]
+        [InlineData("http://localhost:5173", true)]
+        [InlineData("http://localhost:5174", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void MatchesExactAndWildcardOrigins(string? origin, bool expected)
+        {
+            var matcher = new EtabsBridge.Core.Http.OriginMatcher(new[] { "https://app.example.com/", "https://*.vercel.app", "http://localhost:5173", " " });
+            Assert.Equal(expected, matcher.IsAllowed(origin));
+        }
+
+        [Fact]
+        public void StarAllowsAnything()
+        {
+            Assert.True(new EtabsBridge.Core.Http.OriginMatcher(new[] { "*" }).IsAllowed("https://anything.example"));
+        }
+
+        [Fact]
+        public void EmptyListAllowsNothing()
+        {
+            Assert.False(new EtabsBridge.Core.Http.OriginMatcher(System.Array.Empty<string>()).IsAllowed("http://localhost:5173"));
+        }
+    }
+}

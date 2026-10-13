@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { ApiTypeDescription } from "@etabs-bridge/client";
+import { isOriginAllowed, type ApiTypeDescription } from "@etabs-bridge/client";
 import { registerInstance, unregisterInstance } from "@etabs-bridge/client/registry";
 import { createSampleModel, type SampleModel, type SampleModelOptions } from "./sampleModel.js";
 
@@ -79,6 +79,7 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
     "/geometry/joints": { GET: async () => (await delay(), { units: model.geometry.units, joints: model.geometry.joints }) },
     "/geometry/frames": { GET: async () => (await delay(), { units: model.geometry.units, frames: model.geometry.frames }) },
     "/geometry/areas": { GET: async () => (await delay(), { units: model.geometry.units, areas: model.geometry.areas }) },
+    "/sections": { GET: async () => (await delay(), model.sections) },
     "/tables": { GET: async () => (await delay(), { tables: model.tables }) },
     "/tables/data": { GET: async (url) => (await delay(), tableData(url)) },
     "/rpc/describe": { GET: async (url) => describe(url.searchParams.get("path") ?? "") },
@@ -290,8 +291,7 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
 
       const origin = req.headers.origin;
       if (origin) {
-        const ok = allowedOrigins.some((o) => o === "*" || o.replace(/\/$/, "").toLowerCase() === origin.toLowerCase());
-        if (!ok) throw new HttpError(403, "FORBIDDEN_ORIGIN", `Origin '${origin}' is not allowed. Add it to allowedOrigins in the ETABS Bridge settings.`);
+        if (!isOriginAllowed(origin, allowedOrigins)) throw new HttpError(403, "FORBIDDEN_ORIGIN", `Origin '${origin}' is not allowed. Add it to allowedOrigins in the ETABS Bridge settings.`);
         Object.assign(headers, {
           "Access-Control-Allow-Origin": origin,
           Vary: "Origin",

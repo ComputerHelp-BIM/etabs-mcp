@@ -151,6 +151,97 @@ export const GeometrySnapshotSchema = z.object({
   areas: z.array(AreaObjectSchema),
 });
 
+// ---- Sections & materials (0.2.0). Values ETABS could not provide are null.
+
+export const MATERIAL_TYPES = ["Concrete", "Steel", "Rebar", "Tendon", "Aluminum", "ColdFormed", "Masonry", "NoDesign", "Other"] as const;
+
+export const MaterialSchema = z.object({
+  name: z.string(),
+  type: z.enum(MATERIAL_TYPES),
+  color: z.string(),
+  /** Modulus of elasticity (force/length²). */
+  e: z.number().nullable(),
+  poisson: z.number().nullable(),
+  thermalCoefficient: z.number().nullable(),
+  /** Weight per unit volume (force/length³). */
+  unitWeight: z.number().nullable(),
+  /** Concrete f'c (force/length²). */
+  fc: z.number().nullable(),
+  fy: z.number().nullable(),
+  fu: z.number().nullable(),
+});
+
+export const SectionPropertiesSchema = z.object({
+  area: z.number(),
+  as2: z.number(),
+  as3: z.number(),
+  torsion: z.number(),
+  i22: z.number(),
+  i33: z.number(),
+  s22: z.number(),
+  s33: z.number(),
+  z22: z.number(),
+  z33: z.number(),
+  r22: z.number(),
+  r33: z.number(),
+});
+
+export const FRAME_SHAPES = [
+  "Rectangular",
+  "Circle",
+  "I",
+  "Box",
+  "Pipe",
+  "Tee",
+  "Angle",
+  "Channel",
+  "DoubleAngle",
+  "DoubleChannel",
+  "SectionDesigner",
+  "Nonprismatic",
+  "AutoSelect",
+  "General",
+  "Other",
+] as const;
+
+export const FrameSectionSchema = z.object({
+  name: z.string(),
+  shape: z.enum(FRAME_SHAPES),
+  etabsType: z.string(),
+  material: z.string(),
+  color: z.string(),
+  /** t3, along local axis 2 (diameter for circles/pipes). */
+  depth: z.number().nullable(),
+  /** t2, along local axis 3. */
+  width: z.number().nullable(),
+  flangeThickness: z.number().nullable(),
+  webThickness: z.number().nullable(),
+  bottomWidth: z.number().nullable(),
+  bottomFlangeThickness: z.number().nullable(),
+  properties: SectionPropertiesSchema.nullable(),
+});
+
+export const AREA_SECTION_KINDS = ["Slab", "Wall", "Deck", "Other"] as const;
+
+export const AreaSectionSchema = z.object({
+  name: z.string(),
+  kind: z.enum(AREA_SECTION_KINDS),
+  subType: z.string(),
+  shellType: z.string(),
+  material: z.string(),
+  thickness: z.number().nullable(),
+  color: z.string(),
+});
+
+export const SectionsResultSchema = z.object({
+  units: UnitsInfoSchema,
+  materials: z.array(MaterialSchema),
+  frameSections: z.array(FrameSectionSchema),
+  areaSections: z.array(AreaSectionSchema),
+  /** API calls that were unavailable or failed (affected values are null). */
+  warnings: z.array(z.string()),
+});
+
 export const TableInfoSchema = z.object({
   key: z.string(),
   name: z.string(),
@@ -225,6 +316,13 @@ export type AreaType = z.infer<typeof AreaTypeSchema>;
 export type AreaObject = z.infer<typeof AreaObjectSchema>;
 export type AreasResult = z.infer<typeof AreasResultSchema>;
 export type GeometrySnapshot = z.infer<typeof GeometrySnapshotSchema>;
+export type MaterialType = z.infer<typeof MaterialSchema>["type"];
+export type Material = z.infer<typeof MaterialSchema>;
+export type SectionProperties = z.infer<typeof SectionPropertiesSchema>;
+export type FrameShape = z.infer<typeof FrameSectionSchema>["shape"];
+export type FrameSection = z.infer<typeof FrameSectionSchema>;
+export type AreaSection = z.infer<typeof AreaSectionSchema>;
+export type SectionsResult = z.infer<typeof SectionsResultSchema>;
 export type TableInfo = z.infer<typeof TableInfoSchema>;
 export type TablesResult = z.infer<typeof TablesResultSchema>;
 export type TableData = z.infer<typeof TableDataSchema>;

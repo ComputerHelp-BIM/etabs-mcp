@@ -59,6 +59,12 @@ namespace EtabsBridge.Core.Tests
         }
 
         [Fact]
+        public void SectionsMatchContract()
+        {
+            AssertMatchesFixture("sections.json", new SectionService(new FakeEtabsModel()).GetSections());
+        }
+
+        [Fact]
         public void TablesMatchContract()
         {
             var model = new FakeEtabsModel();

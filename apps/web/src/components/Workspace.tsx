@@ -1,7 +1,12 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import {
+  BridgeError,
   summarizeGeometry,
   type AreaObject,
+  type AreaSection,
+  type FrameSection,
+  type Material,
+  type SectionsResult,
   type BridgeClient,
   type FrameMember,
   type GeometrySnapshot,
@@ -19,7 +24,19 @@ import { TablesBrowser } from "./TablesBrowser";
 // three.js is the bulk of the bundle; load it only when the 3D tab is shown.
 const ModelViewer = lazy(() => import("./ModelViewer").then((m) => ({ default: m.ModelViewer })));
 
-const TABS = ["3D view", "Summary", "Stories", "Grids", "Joints", "Frames", "Areas", "Database tables", "API console"] as const;
+const TABS = [
+  "3D view",
+  "Summary",
+  "Stories",
+  "Grids",
+  "Joints",
+  "Frames",
+  "Areas",
+  "Sections",
+  "Materials",
+  "Database tables",
+  "API console",
+] as const;
 type Tab = (typeof TABS)[number];
 
 interface Props {
@@ -29,6 +46,12 @@ interface Props {
 
 export function Workspace({ client, onDisconnect }: Props) {
   const geometry = useAsync(() => client.geometry(), [client]);
+  // Sections arrived in bridge 0.2.0: an older plugin answers 404, which is not an error for the app.
+  const sectionsState = useAsync(
+    () => client.sections().catch((err: unknown) => (err instanceof BridgeError && err.code === "NOT_FOUND" ? null : Promise.reject(err))),
+    [client],
+  );
+  const sections = sectionsState.data ?? null;
   const [tab, setTab] = useState<Tab>("3D view");
   const [selection, setSelection] = useState<Selection>(null);
   const g = geometry.data;
@@ -47,7 +70,14 @@ export function Workspace({ client, onDisconnect }: Props) {
           </div>
         )}
         <div className="actions">
-          <button type="button" onClick={geometry.reload} disabled={geometry.status === "loading"}>
+          <button
+            type="button"
+            onClick={() => {
+              geometry.reload();
+              sectionsState.reload();
+            }}
+            disabled={geometry.status === "loading"}
+          >
             {geometry.status === "loading" ? "Reading model…" : "Refresh"}
           </button>
           <button type="button" onClick={onDisconnect}>
@@ -69,15 +99,30 @@ export function Workspace({ client, onDisconnect }: Props) {
           {explain(geometry.error)}
         </p>
       )}
+      {sectionsState.status === "error" && (
+        <p className="error banner" role="alert">
+          Sections and materials could not be read: {explain(sectionsState.error)}
+        </p>
+      )}
+      {sections && sections.warnings.length > 0 && (
+        <details className="warn banner">
+          <summary>{sections.warnings.length} section/material value(s) could not be read from ETABS (shown as "—")</summary>
+          <ul>
+            {sections.warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </details>
+      )}
       {!g && geometry.status === "loading" && <p className="muted pad">Reading geometry from ETABS…</p>}
 
       <main className="content">
         {g && tab === "3D view" && (
           <div className="viewer-layout">
             <Suspense fallback={<p className="muted pad">Loading 3D engine…</p>}>
-              <ModelViewer geometry={g} selection={selection} onSelect={setSelection} />
+              <ModelViewer geometry={g} sections={sections} selection={selection} onSelect={setSelection} />
             </Suspense>
-            <PropertiesPanel geometry={g} selection={selection} />
+            <PropertiesPanel geometry={g} sections={sections} selection={selection} />
           </div>
         )}
         {g && tab === "Summary" && <SummaryView geometry={g} />}
@@ -86,6 +131,8 @@ export function Workspace({ client, onDisconnect }: Props) {
         {g && tab === "Joints" && <JointsTable geometry={g} />}
         {g && tab === "Frames" && <FramesTable geometry={g} onSelect={(f) => setSelection({ kind: "frame", name: f.name })} selected={selection} />}
         {g && tab === "Areas" && <AreasTable geometry={g} onSelect={(a) => setSelection({ kind: "area", name: a.name })} selected={selection} />}
+        {tab === "Sections" && <SectionsView sections={sections} loading={sectionsState.status === "loading"} geometry={g} />}
+        {tab === "Materials" && <MaterialsView sections={sections} loading={sectionsState.status === "loading"} />}
         {tab === "Database tables" && <TablesBrowser client={client} />}
         {tab === "API console" && <ApiConsole client={client} />}
       </main>
@@ -93,7 +140,7 @@ export function Workspace({ client, onDisconnect }: Props) {
   );
 }
 
-function PropertiesPanel({ geometry, selection }: { geometry: GeometrySnapshot; selection: Selection }) {
+function PropertiesPanel({ geometry, sections, selection }: { geometry: GeometrySnapshot; sections: SectionsResult | null; selection: Selection }) {
   const rows = useMemo((): Array<[string, string]> | null => {
     if (!selection) return null;
     const u = geometry.units.length;
@@ -113,6 +160,7 @@ function PropertiesPanel({ geometry, selection }: { geometry: GeometrySnapshot; 
         ["Length", `${fmt(length)} ${u}`],
         ["Angle", `${fmt(f.angle)}°`],
         ["Cardinal point", String(f.cardinalPoint)],
+        ...frameSectionRows(sections, f.section, geometry.units.length),
       ];
     }
     if (selection.kind === "area") {
@@ -125,6 +173,7 @@ function PropertiesPanel({ geometry, selection }: { geometry: GeometrySnapshot; 
         ["Section", a.section],
         ["Joints", a.joints.join(", ")],
         ["Vertices", String(a.points.length)],
+        ...areaSectionRows(sections, a.section, geometry.units.length),
       ];
     }
     const j = geometry.joints.find((x) => x.name === selection.name);
@@ -135,7 +184,7 @@ function PropertiesPanel({ geometry, selection }: { geometry: GeometrySnapshot; 
       ["Coordinates", xyz(j)],
       ["Restraints", restraintText(j)],
     ];
-  }, [geometry, selection]);
+  }, [geometry, sections, selection]);
 
   return (
     <aside className="properties card">
@@ -295,6 +344,91 @@ function AreasTable({ geometry, onSelect, selected }: { geometry: GeometrySnapsh
   return (
     <div className="pad">
       <DataTable rows={geometry.areas} rowKey={(a) => a.name} columns={columns} onSelect={onSelect} selectedKey={selected?.kind === "area" ? selected.name : null} />
+    </div>
+  );
+}
+
+function frameSectionRows(sections: SectionsResult | null, name: string, u: string): Array<[string, string]> {
+  const s = sections?.frameSections.find((x) => x.name === name);
+  if (!s) return [];
+  const m = sections?.materials.find((x) => x.name === s.material);
+  return [
+    ["Shape", s.shape],
+    ["Size (b × d)", s.width && s.depth ? `${fmt(s.width)} × ${fmt(s.depth)} ${u}` : "—"],
+    ["Material", m ? `${m.name} (${m.type})` : s.material || "—"],
+    ...(s.properties ? ([["Area", `${fmt(s.properties.area)} ${u}²`]] as Array<[string, string]>) : []),
+  ];
+}
+
+function areaSectionRows(sections: SectionsResult | null, name: string, u: string): Array<[string, string]> {
+  const s = sections?.areaSections.find((x) => x.name === name);
+  if (!s) return [];
+  const m = sections?.materials.find((x) => x.name === s.material);
+  return [
+    ["Kind", s.subType ? `${s.kind} (${s.subType})` : s.kind],
+    ["Thickness", s.thickness ? `${fmt(s.thickness)} ${u}` : "—"],
+    ["Material", m ? `${m.name} (${m.type})` : s.material || "—"],
+  ];
+}
+
+const dash = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n);
+
+function SectionsView({ sections, loading, geometry }: { sections: SectionsResult | null; loading: boolean; geometry: GeometrySnapshot | undefined }) {
+  const usage = useMemo(() => {
+    const count = new Map<string, number>();
+    for (const o of [...(geometry?.frames ?? []), ...(geometry?.areas ?? [])]) count.set(o.section, (count.get(o.section) ?? 0) + 1);
+    return count;
+  }, [geometry]);
+  if (!sections) return <p className="muted pad">{loading ? "Reading sections from ETABS…" : "Sections need ETABS Bridge 0.2.0 or newer in ETABS."}</p>;
+  const u = sections.units.length;
+  const frameColumns: Column<FrameSection>[] = [
+    { key: "name", header: "Name", value: (s) => s.name, render: (s) => <><span className="dot" style={{ background: s.color }} />{s.name}</> },
+    { key: "shape", header: "Shape", value: (s) => s.shape },
+    { key: "material", header: "Material", value: (s) => s.material },
+    { key: "d", header: `Depth (${u})`, value: (s) => dash(s.depth), numeric: true },
+    { key: "b", header: `Width (${u})`, value: (s) => dash(s.width), numeric: true },
+    { key: "tf", header: `tf (${u})`, value: (s) => dash(s.flangeThickness), numeric: true },
+    { key: "tw", header: `tw (${u})`, value: (s) => dash(s.webThickness), numeric: true },
+    { key: "area", header: `Area (${u}²)`, value: (s) => dash(s.properties?.area), numeric: true },
+    { key: "i33", header: `I33 (${u}⁴)`, value: (s) => (s.properties ? s.properties.i33.toExponential(3) : "—"), numeric: true },
+    { key: "used", header: "Objects", value: (s) => usage.get(s.name) ?? 0, numeric: true },
+  ];
+  const areaColumns: Column<AreaSection>[] = [
+    { key: "name", header: "Name", value: (s) => s.name, render: (s) => <><span className="dot" style={{ background: s.color }} />{s.name}</> },
+    { key: "kind", header: "Kind", value: (s) => s.kind },
+    { key: "sub", header: "Type", value: (s) => s.subType || "—" },
+    { key: "shell", header: "Shell", value: (s) => s.shellType || "—" },
+    { key: "material", header: "Material", value: (s) => s.material },
+    { key: "t", header: `Thickness (${u})`, value: (s) => dash(s.thickness), numeric: true },
+    { key: "used", header: "Objects", value: (s) => usage.get(s.name) ?? 0, numeric: true },
+  ];
+  return (
+    <div className="pad">
+      <h2>Frame sections</h2>
+      <DataTable rows={[...sections.frameSections]} rowKey={(s) => s.name} columns={frameColumns} />
+      <h2>Area sections</h2>
+      <DataTable rows={[...sections.areaSections]} rowKey={(s) => s.name} columns={areaColumns} />
+    </div>
+  );
+}
+
+function MaterialsView({ sections, loading }: { sections: SectionsResult | null; loading: boolean }) {
+  if (!sections) return <p className="muted pad">{loading ? "Reading materials from ETABS…" : "Materials need ETABS Bridge 0.2.0 or newer in ETABS."}</p>;
+  const { force: f, length: u } = sections.units;
+  const stress = `${f}/${u}²`;
+  const columns: Column<Material>[] = [
+    { key: "name", header: "Name", value: (m) => m.name, render: (m) => <><span className="dot" style={{ background: m.color }} />{m.name}</> },
+    { key: "type", header: "Type", value: (m) => m.type },
+    { key: "e", header: `E (${stress})`, value: (m) => (m.e === null ? "—" : m.e.toExponential(3)), numeric: true },
+    { key: "nu", header: "Poisson", value: (m) => dash(m.poisson), numeric: true },
+    { key: "w", header: `Unit weight (${f}/${u}³)`, value: (m) => dash(m.unitWeight), numeric: true },
+    { key: "fc", header: `f'c (${stress})`, value: (m) => dash(m.fc), numeric: true },
+    { key: "fy", header: `Fy (${stress})`, value: (m) => dash(m.fy), numeric: true },
+    { key: "fu", header: `Fu (${stress})`, value: (m) => dash(m.fu), numeric: true },
+  ];
+  return (
+    <div className="pad">
+      <DataTable rows={[...sections.materials]} rowKey={(m) => m.name} columns={columns} />
     </div>
   );
 }

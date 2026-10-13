@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BridgeClient, BridgeError, GeometrySnapshotSchema, summarizeGeometry } from "@etabs-bridge/client";
+import { BridgeClient, BridgeError, GeometrySnapshotSchema, SectionsResultSchema, summarizeGeometry } from "@etabs-bridge/client";
 import { listInstances } from "@etabs-bridge/client/registry";
 import { createSampleModel, startMockBridge, type MockBridge } from "../src/index.js";
 
@@ -25,6 +25,17 @@ describe("createSampleModel", () => {
     for (const a of geometry.areas) expect(a.points).toHaveLength(a.joints.length);
   });
 
+  it("defines every section and material the geometry uses", () => {
+    const { geometry, sections } = createSampleModel();
+    SectionsResultSchema.parse(sections);
+    const frameSections = new Set(sections.frameSections.map((s) => s.name));
+    const areaSections = new Set(sections.areaSections.map((s) => s.name));
+    const materials = new Set(sections.materials.map((m) => m.name));
+    for (const f of geometry.frames) expect(frameSections.has(f.section)).toBe(true);
+    for (const a of geometry.areas) expect(areaSections.has(a.section)).toBe(true);
+    for (const s of [...sections.frameSections, ...sections.areaSections]) expect(materials.has(s.material)).toBe(true);
+  });
+
   it("rejects empty buildings", () => {
     expect(() => createSampleModel({ stories: 0 })).toThrow();
   });
@@ -37,7 +48,13 @@ describe("mock bridge over HTTP", () => {
 
   beforeAll(async () => {
     registryDir = mkdtempSync(join(tmpdir(), "etabs-mock-"));
-    bridge = await startMockBridge({ port: 0, token: "test-token-0123456789", register: true, registryDir });
+    bridge = await startMockBridge({
+      port: 0,
+      token: "test-token-0123456789",
+      register: true,
+      registryDir,
+      allowedOrigins: ["http://localhost:5173", "https://etabs-viewer-*.vercel.app"],
+    });
     client = new BridgeClient({ baseUrl: bridge.url, token: bridge.token });
   });
 
@@ -61,6 +78,7 @@ describe("mock bridge over HTTP", () => {
     expect((await client.joints()).joints).toHaveLength(g.joints.length);
     expect((await client.frames()).frames).toHaveLength(g.frames.length);
     expect((await client.areas()).areas).toHaveLength(g.areas.length);
+    expect((await client.sections()).frameSections.map((s) => s.name)).toContain("B300x600");
   });
 
   it("serves database tables with paging and field selection", async () => {
@@ -107,6 +125,9 @@ describe("mock bridge over HTTP", () => {
     });
     expect(preflight.status).toBe(204);
     expect(preflight.headers.get("access-control-allow-private-network")).toBe("true");
+
+    const vercel = await fetch(`${bridge.url}/api/v1/health`, { headers: { Origin: "https://etabs-viewer-abc123.vercel.app" } });
+    expect(vercel.status).toBe(200);
 
     const notFound = await fetch(`${bridge.url}/api/v1/nope`, { headers: { Authorization: `Bearer ${bridge.token}` } });
     expect(notFound.status).toBe(404);

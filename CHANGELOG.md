@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-13
+
+### Added
+
+- **Sections & materials** (`GET /api/v1/sections`): materials (type, E, Poisson, thermal coefficient, unit weight,
+  f'c, Fy, Fu), frame sections (normalized shape, material, depth/width/flange/web dimensions, section properties),
+  and area sections (slab/wall/deck, sub-type, shell type, thickness, material). Read by late binding: a getter
+  missing in your ETABS version yields `null` values plus a `warnings` entry instead of failing.
+- **Solid 3D view** (default) next to the analytical view: frames swept with their real section profile using ETABS
+  local axes, rotation angle and cardinal points; slabs and walls extruded by thickness; crease edges for a concrete look.
+- **Colour by** object type, material, section or story, with a data-driven legend.
+- Web app **Sections** and **Materials** tabs; the Properties panel shows section size, area and material.
+- MCP tool `etabs_get_sections`; `BridgeClient.sections()`.
+- Host-wildcard **allowed origins** (`https://my-app-*.vercel.app`), with identical rules in C# and TypeScript.
+- **Vercel deployment**: `vercel.json` (build, output, security headers with a strict Content-Security-Policy) and
+  `docs/deploy-vercel.md`.
+
+### Changed
+
+- RPC: omitted enum parameters now default to value 0 (CSI's "all/none"), not the first enum member.
+
 ## [0.1.0] - 2026-10-13
 
 ### Added

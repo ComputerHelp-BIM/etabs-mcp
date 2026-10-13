@@ -14,7 +14,7 @@ import {
 import { ConnectionError, type ConnectionResolver } from "./connection.js";
 
 export const SERVER_NAME = "etabs-bridge";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.2.0";
 
 export interface ServerOptions {
   resolver: ConnectionResolver;
@@ -229,6 +229,39 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
       const { units, areas } = await cached(client, "areas", () => client.areas());
       const filtered = areas.filter((a: AreaObject) => (!s || a.story === s) && (!type || a.type === type) && (!section || a.section === section));
       return { units, ...page(filtered, o, l) };
+    }),
+  );
+
+  server.registerTool(
+    "etabs_get_sections",
+    {
+      title: "Sections and materials",
+      description:
+        "Materials (type, E, unit weight, f'c, Fy, Fu), frame sections (shape, material, depth/width/flange/web dimensions, " +
+        "section properties) and area sections (slab/wall/deck, thickness, material). Values ETABS could not provide are null; " +
+        "'warnings' lists why.",
+      inputSchema: {
+        instance,
+        include: z
+          .enum(["all", "materials", "frameSections", "areaSections"])
+          .default("all")
+          .describe("Limit the output to one list."),
+        search: z.string().optional().describe("Case-insensitive name filter, e.g. \"C600\" or \"slab\"."),
+      },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, include, search }) => {
+      const client = resolver.client(pid);
+      const all = await cached(client, "sections", () => client.sections());
+      const q = (search ?? "").toLowerCase();
+      const match = <T extends { name: string }>(items: T[]) => (q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items);
+      return {
+        units: all.units,
+        ...(include === "all" || include === "materials" ? { materials: match(all.materials) } : {}),
+        ...(include === "all" || include === "frameSections" ? { frameSections: match(all.frameSections) } : {}),
+        ...(include === "all" || include === "areaSections" ? { areaSections: match(all.areaSections) } : {}),
+        warnings: all.warnings,
+      };
     }),
   );
 

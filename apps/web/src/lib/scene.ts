@@ -61,12 +61,16 @@ export interface FrameBuffers {
   frames: FrameMember[];
 }
 
-export function buildFrameBuffers(frames: FrameMember[], highlight?: string | null): FrameBuffers {
+export function buildFrameBuffers(
+  frames: FrameMember[],
+  highlight?: string | null,
+  colorOf: (f: FrameMember) => string = (f) => FRAME_COLORS[f.type],
+): FrameBuffers {
   const positions = new Float32Array(frames.length * 6);
   const colors = new Float32Array(frames.length * 6);
   frames.forEach((f, k) => {
     positions.set([f.start.x, f.start.y, f.start.z, f.end.x, f.end.y, f.end.z], k * 6);
-    const rgb = hexToRgb(f.name === highlight ? HIGHLIGHT_COLOR : FRAME_COLORS[f.type]);
+    const rgb = hexToRgb(f.name === highlight ? HIGHLIGHT_COLOR : colorOf(f));
     colors.set([...rgb, ...rgb], k * 6);
   });
   return { positions, colors, frames };
@@ -86,7 +90,11 @@ export interface AreaBuffers {
  * Triangulates each area polygon. Works for non-convex floors: the polygon is projected
  * onto its own best-fit plane (Newell normal) and ear-clipped there.
  */
-export function buildAreaBuffers(areas: AreaObject[], highlight?: string | null): AreaBuffers {
+export function buildAreaBuffers(
+  areas: AreaObject[],
+  highlight?: string | null,
+  colorOf: (a: AreaObject) => string = (a) => AREA_COLORS[a.type],
+): AreaBuffers {
   const pos: number[] = [];
   const col: number[] = [];
   const owner: number[] = [];
@@ -98,7 +106,7 @@ export function buildAreaBuffers(areas: AreaObject[], highlight?: string | null)
       skipped.push(area.name);
       return;
     }
-    const rgb = hexToRgb(area.name === highlight ? HIGHLIGHT_COLOR : AREA_COLORS[area.type]);
+    const rgb = hexToRgb(area.name === highlight ? HIGHLIGHT_COLOR : colorOf(area));
     for (const tri of triangles) {
       for (const v of tri) {
         pos.push(v.x, v.y, v.z);

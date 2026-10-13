@@ -10,6 +10,7 @@ import {
   HealthSchema,
   JointsResultSchema,
   ModelInfoSchema,
+  SectionsResultSchema,
   StoriesResultSchema,
   TableDataSchema,
   TablesResultSchema,
@@ -22,6 +23,7 @@ import {
   type Health,
   type JointsResult,
   type ModelInfo,
+  type SectionsResult,
   type StoriesResult,
   type TableData,
   type TablesResult,
@@ -133,6 +135,11 @@ export class BridgeClient {
 
   areas(): Promise<AreasResult> {
     return this.request("GET", "/geometry/areas", AreasResultSchema);
+  }
+
+  /** Materials, frame sections and area sections (with dimensions and properties). Since bridge 0.2.0. */
+  sections(): Promise<SectionsResult> {
+    return this.request("GET", "/sections", SectionsResultSchema);
   }
 
   /** Catalogue of ETABS database tables (Display > Show Tables). */

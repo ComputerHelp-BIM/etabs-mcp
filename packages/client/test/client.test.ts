@@ -8,6 +8,8 @@ import {
   TableDataSchema,
   TablesResultSchema,
   isBridgeUrl,
+  isOriginAllowed,
+  SectionsResultSchema,
   normalizeBridgeUrl,
   parseConnectionFragment,
   parseConnectionJson,
@@ -22,6 +24,13 @@ describe("contract fixtures (written by the C# serializer)", () => {
     const parsed = GeometrySnapshotSchema.parse(fixture("geometry.json"));
     expect(parsed.frames).toHaveLength(5);
     expect(parsed.areas[0]?.points).toHaveLength(4);
+  });
+
+  it("sections.json matches SectionsResultSchema", () => {
+    const parsed = SectionsResultSchema.parse(fixture("sections.json"));
+    expect(parsed.frameSections.find((s) => s.name === "W12X26")?.shape).toBe("I");
+    expect(parsed.materials.find((m) => m.name === "C30")?.fc).toBe(30000);
+    expect(parsed.warnings.length).toBeGreaterThan(0);
   });
 
   it("tables.json and table-data.json match their schemas", () => {
@@ -73,6 +82,22 @@ describe("connection parsing", () => {
     expect(normalizeBridgeUrl("http://[::1]:52781")).toBe("http://localhost:52781");
     expect(normalizeBridgeUrl("http://localhost:52780//")).toBe("http://localhost:52780");
     expect(new BridgeClient({ baseUrl: "http://127.0.0.1:1/", token: "t" }).baseUrl).toBe("http://localhost:1");
+  });
+
+  it.each([
+    ["https://app.example.com", true],
+    ["https://APP.example.com/", true],
+    ["http://app.example.com", false],
+    ["https://etabs-viewer.vercel.app", true],
+    ["https://etabs-viewer-git-dev-team.vercel.app", true],
+    ["https://a.b.vercel.app", false],
+    ["https://vercel.app", false],
+    ["https://x.vercel.app.evil.com", false],
+    ["http://localhost:5173", true],
+    ["http://localhost:5174", false],
+    ["", false],
+  ])("isOriginAllowed(%s) = %s (same table as the C# OriginMatcher tests)", (origin, expected) => {
+    expect(isOriginAllowed(origin, ["https://app.example.com/", "https://*.vercel.app", "http://localhost:5173", " "])).toBe(expected);
   });
 
   it.each([

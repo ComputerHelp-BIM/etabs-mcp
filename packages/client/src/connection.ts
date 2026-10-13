@@ -57,3 +57,20 @@ export function normalizeBridgeUrl(url: string): string {
     return url.replace(/\/+$/, "");
   }
 }
+
+/**
+ * Same rules as the plugin's OriginMatcher (C#): "*" allows all; exact origins match
+ * case-insensitively; "*" inside an entry matches one DNS label ([a-z0-9-]+, never a dot).
+ */
+export function isOriginAllowed(origin: string | undefined | null, allowedOrigins: readonly string[]): boolean {
+  if (!origin) return false;
+  const o = origin.replace(/\/+$/, "").toLowerCase();
+  return allowedOrigins.some((raw) => {
+    const entry = raw.trim().replace(/\/+$/, "").toLowerCase();
+    if (!entry) return false;
+    if (entry === "*") return true;
+    if (!entry.includes("*")) return entry === o;
+    const pattern = entry.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[a-z0-9-]+");
+    return new RegExp(`^${pattern}$`).test(o);
+  });
+}
