@@ -19,6 +19,7 @@ import { useAsync } from "../state/useAsync";
 import { useProject } from "../state/useProject";
 import { ApiConsole } from "./ApiConsole";
 import { BoqView } from "./BoqView";
+import { FourDView } from "./FourDView";
 import { explain } from "./ConnectPanel";
 import { DataTable, type Column } from "./DataTable";
 import type { Selection } from "./ModelViewer";
@@ -38,6 +39,7 @@ const TABS = [
   "Sections",
   "Materials",
   "BOQ & Cost",
+  "4D Simulation",
   "Database tables",
   "API console",
 ] as const;
@@ -162,6 +164,7 @@ export function Workspace({ client, onDisconnect }: Props) {
               {sectionsState.status === "loading" ? "Reading sections…" : "Quantities need section data (ETABS Bridge 0.2.0 or newer) and a recognised unit system."}
             </p>
           ))}
+        {g && tab === "4D Simulation" && <FourDView geometry={g} sections={sections} elements={elements} project={project} update={updateProject} />}
         {tab === "Database tables" && <TablesBrowser client={client} />}
         {tab === "API console" && <ApiConsole client={client} />}
       </main>

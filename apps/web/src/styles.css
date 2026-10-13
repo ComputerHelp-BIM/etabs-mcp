@@ -780,3 +780,96 @@ input.short {
   text-align: right;
   font-size: 1.05rem;
 }
+
+/* 4D */
+.fourd > section,
+.fourd > .playback {
+  margin-bottom: 1rem;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-end;
+}
+
+.settings-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.settings-row .grow {
+  flex: 1 1 220px;
+}
+
+.weekdays {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.weekdays legend {
+  padding: 0;
+  margin-bottom: 0.2rem;
+}
+
+.settings-row .weekdays label {
+  flex-direction: row;
+}
+
+.playback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.playback .grow {
+  flex: 1 1 240px;
+}
+
+.playback .date {
+  min-width: 7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fourd-layout {
+  padding: 0;
+  margin-bottom: 1rem;
+  height: auto;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+tr.edited td:first-child {
+  font-weight: 600;
+}
+
+.chart-plot {
+  position: relative;
+}

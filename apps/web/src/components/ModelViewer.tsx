@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Edges, GizmoHelper, GizmoViewport, OrbitControls } from "@react-three/drei";
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, Vector3 } from "three";
-import type { AreaObject, FrameMember, GeometrySnapshot, SectionsResult } from "@etabs-bridge/client";
+import type { AreaObject, ElementStatus, FrameMember, GeometrySnapshot, SectionsResult } from "@etabs-bridge/client";
 import { COLOR_MODES, COLOR_MODE_LABELS, createColorizer, type ColorMode, type LegendEntry } from "../lib/colors";
 import { buildAreaBuffers, buildFrameBuffers, computeBounds, jointPositions, visibleStories, type Bounds } from "../lib/scene";
 import { buildSolidModel, type SolidBuffers } from "../lib/solid";
@@ -17,7 +17,17 @@ interface Props {
   sections: SectionsResult | null;
   selection: Selection;
   onSelect: (selection: Selection) => void;
+  /**
+   * 4D: construction status per element key ("frame:<name>", "area:<name>"). Not-started elements are
+   * hidden, in-progress ones drawn in the in-progress colour; unscheduled elements are shown normally.
+   */
+  status?: ReadonlyMap<string, ElementStatus> | null;
+  /** Initial display mode (default solid). */
+  initialDisplay?: DisplayMode;
 }
+
+/** Status colour for elements under construction (4D). */
+export const IN_PROGRESS_COLOR = "#f5a524";
 
 /**
  * Interactive 3D view.
@@ -25,18 +35,36 @@ interface Props {
  *  - Analytical: centre lines and mid-surfaces, as in the ETABS analytical model.
  * Colours are bound to model data (type, material, section, story). Click an object to select it.
  */
-export function ModelViewer({ geometry, sections, selection, onSelect }: Props) {
-  const [display, setDisplay] = useState<DisplayMode>("solid");
+export function ModelViewer({ geometry, sections, selection, onSelect, status, initialDisplay = "solid" }: Props) {
+  const [display, setDisplay] = useState<DisplayMode>(initialDisplay);
   const [colorMode, setColorMode] = useState<ColorMode>("material");
   const [upTo, setUpTo] = useState<string | null>(null);
   const [show, setShow] = useState({ frames: true, areas: true, joints: false });
 
   const bounds = useMemo(() => computeBounds(geometry), [geometry]);
   const stories = useMemo(() => visibleStories(geometry, upTo), [geometry, upTo]);
-  const frames = useMemo(() => geometry.frames.filter((f) => stories.has(f.story)), [geometry, stories]);
-  const areas = useMemo(() => geometry.areas.filter((a) => stories.has(a.story)), [geometry, stories]);
+  const built = (key: string) => status?.get(key) !== "not-started";
+  const frames = useMemo(
+    () => geometry.frames.filter((f) => stories.has(f.story) && built(`frame:${f.name}`)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- built() depends only on status
+    [geometry, stories, status],
+  );
+  const areas = useMemo(
+    () => geometry.areas.filter((a) => stories.has(a.story) && built(`area:${a.name}`)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- built() depends only on status
+    [geometry, stories, status],
+  );
   const joints = useMemo(() => geometry.joints.filter((j) => stories.has(j.story)), [geometry, stories]);
-  const colors = useMemo(() => createColorizer(colorMode, geometry, sections), [colorMode, geometry, sections]);
+  const colors = useMemo(() => {
+    const base = createColorizer(colorMode, geometry, sections);
+    if (!status) return base;
+    const active = (key: string) => status.get(key) === "in-progress";
+    return {
+      frame: (f: FrameMember) => (active(`frame:${f.name}`) ? IN_PROGRESS_COLOR : base.frame(f)),
+      area: (a: AreaObject) => (active(`area:${a.name}`) ? IN_PROGRESS_COLOR : base.area(a)),
+      legend: [...base.legend, { label: "Under construction", color: IN_PROGRESS_COLOR }],
+    };
+  }, [colorMode, geometry, sections, status]);
 
   return (
     <div className="viewer">

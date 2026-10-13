@@ -57,6 +57,7 @@ describe("MCP server against the mock bridge", () => {
         "etabs_get_areas",
         "etabs_get_sections",
         "etabs_get_boq",
+        "etabs_generate_schedule",
         "etabs_list_tables",
         "etabs_get_table",
         "etabs_describe_api",
@@ -122,6 +123,17 @@ describe("MCP server against the mock bridge", () => {
     expect(col.rate).toBe(100);
     expect(custom.json.lines.some((l: { code: string }) => l.code.startsWith("RFT-COLUMN"))).toBe(false);
     expect(custom.json.lines.find((l: { code: string }) => l.code.startsWith("FWK-")).amount).toBe(0); // unpriced keys are 0, not samples
+  });
+
+  it("generates a 4D schedule with costs", async () => {
+    const res = await call(client, "etabs_generate_schedule", { startDate: "2026-01-05", workingWeekdays: [1, 2, 3, 4, 5] });
+    expect(res.json.tasks).toHaveLength(12); // 6 stories x (vertical + horizontal)
+    expect(res.json.tasks[0]).toMatchObject({ id: "V-Story1", start: "2026-01-05", finish: "2026-01-09" });
+    expect(res.json.span.start).toBe("2026-01-05");
+    const last = res.json.weeklyCumulativeCost[res.json.weeklyCumulativeCost.length - 1];
+    const sumTasks = res.json.tasks.reduce((s: number, t: { cost: number }) => s + t.cost, 0);
+    expect(Math.abs(last.cumulativeCost - sumTasks)).toBeLessThanOrEqual(12); // rounding per task
+    expect(res.json.ratesAreSamples).toBe(true);
   });
 
   it("validates tool input", async () => {

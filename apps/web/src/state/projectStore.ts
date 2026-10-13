@@ -33,7 +33,7 @@ const ScheduleSettingsSchema = z.object({
   holidays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
 });
 
-export type ScheduleSettings = z.infer<typeof ScheduleSettingsSchema>;
+export type { ScheduleSettings } from "@etabs-bridge/client";
 
 const TaskOverrideSchema = z.object({ start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), finish: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 

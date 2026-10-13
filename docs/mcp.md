@@ -46,6 +46,7 @@ Tokens never appear in tool output.
 | `etabs_get_joints`, `etabs_get_frames`, `etabs_get_areas` | Paged (`offset`/`limit`, `nextOffset`), filterable by story/type/section |
 | `etabs_get_sections` | Materials (E, unit weight, f'c, Fy, Fu), frame sections (shape, dimensions, properties) and area sections (slab/wall, thickness); filterable |
 | `etabs_get_boq` | Bill of quantities and cost (concrete, formwork, rebar, steel), with optional rates and rebar ratios; sample rates are flagged |
+| `etabs_generate_schedule` | 4D baseline schedule (story-by-story, working-day calendar) with cost per task and weekly cumulative cost |
 | `etabs_list_tables`, `etabs_get_table` | Any ETABS database table, searchable and paged |
 | `etabs_describe_api`, `etabs_call_api` | The whole CSI API. Writes are refused unless enabled in the plugin window |
 

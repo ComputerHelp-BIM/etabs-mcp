@@ -244,3 +244,104 @@ export function LineChart({ series, formatX, formatY, ariaLabel, area, marker, h
     </div>
   );
 }
+
+// ------------------------------------------------------------------ Gantt
+
+export interface GanttTask {
+  id: string;
+  label: string;
+  /** Series index (0 or 1) for the bar colour. */
+  series: number;
+  start: number; // UTC ms, inclusive
+  finish: number; // UTC ms, inclusive
+  detail: string;
+}
+
+const DAY_MS = 86_400_000;
+
+/** Task bars on a date axis; series names form the legend; `marker` draws the playback date. */
+export function GanttChart({
+  tasks,
+  seriesNames,
+  marker,
+  formatDate,
+  ariaLabel,
+}: {
+  tasks: GanttTask[];
+  seriesNames: [string, string];
+  marker: number | null;
+  formatDate: (t: number) => string;
+  ariaLabel: string;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const [ref, width] = useWidth(720);
+  const labelWidth = 150;
+  const row = 22;
+  const bar = 14;
+  const top = 4;
+  const axis = 22;
+  const height = top + tasks.length * row + axis;
+  const min = Math.min(...tasks.map((t) => t.start));
+  const max = Math.max(...tasks.map((t) => t.finish)) + DAY_MS;
+  const sx = (t: number) => labelWidth + ((t - min) / Math.max(DAY_MS, max - min)) * (width - labelWidth - 8);
+  const ticks = [0, 1, 2, 3, 4].map((i) => min + ((max - min) * i) / 4);
+  const hovered = hover === null ? null : tasks[hover];
+
+  return (
+    <div className="chart" ref={ref}>
+      <div className="chart-legend">
+        {seriesNames.map((n, i) => (
+          <span key={n} className="legend-item">
+            <span className="swatch area" style={{ background: SERIES[i] }} />
+            {n}
+          </span>
+        ))}
+      </div>
+      <div className="chart-plot">
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel} className="chart-svg">
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={sx(t)} x2={sx(t)} y1={top} y2={height - axis} className="chart-grid" />
+            <text x={sx(t)} y={height - 6} className="chart-axis" textAnchor={i === 0 ? "start" : i === 4 ? "end" : "middle"}>
+              {formatDate(t)}
+            </text>
+          </g>
+        ))}
+        {tasks.map((t, i) => {
+          const y = top + i * row;
+          const x = sx(t.start);
+          const w = Math.max(3, sx(t.finish + DAY_MS) - x);
+          return (
+            <g
+              key={t.id}
+              tabIndex={0}
+              className="chart-hit"
+              onPointerEnter={() => setHover(i)}
+              onPointerLeave={() => setHover(null)}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
+            >
+              <rect x={0} y={y} width={width} height={row} fill="transparent" />
+              <text x={labelWidth - 8} y={y + row / 2} className="chart-label" textAnchor="end" dominantBaseline="central">
+                {t.label}
+              </text>
+              <rect x={x} y={y + (row - bar) / 2} width={w} height={bar} rx={3} fill={SERIES[t.series % SERIES.length]} opacity={hover === null || hover === i ? 1 : 0.55} />
+            </g>
+          );
+        })}
+        {marker !== null && marker >= min && marker <= max && <line x1={sx(marker)} x2={sx(marker)} y1={top} y2={height - axis} className="chart-marker" />}
+      </svg>
+      {hovered && (
+        <div
+          className="chart-tooltip"
+          role="status"
+          style={{ left: Math.min(Math.max(sx(hovered.start), 160), width - 160), top: top + ((hover ?? 0) + 1) * row + 2 }}
+        >
+          <strong>{hovered.label}</strong>
+          <div className="muted small">{hovered.detail}</div>
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}

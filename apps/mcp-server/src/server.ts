@@ -8,6 +8,12 @@ import {
   ELEMENT_CATEGORIES,
   buildBoq,
   computeElementQuantities,
+  costCurve,
+  defaultScheduleSettings,
+  generateSchedule,
+  isoFromTime,
+  scheduleSpan,
+  taskCosts,
   defaultRateTable,
   priceBoq,
   summarizeCost,
@@ -22,7 +28,7 @@ import {
 import { ConnectionError, type ConnectionResolver } from "./connection.js";
 
 export const SERVER_NAME = "etabs-bridge";
-export const SERVER_VERSION = "0.3.0";
+export const SERVER_VERSION = "0.4.0";
 
 export interface ServerOptions {
   resolver: ConnectionResolver;
@@ -322,6 +328,53 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
         unmeasured: issues.slice(0, 50),
         unmeasuredCount: issues.length,
         notes: BOQ_NOTES,
+      };
+    }),
+  );
+
+  server.registerTool(
+    "etabs_generate_schedule",
+    {
+      title: "4D construction schedule",
+      description:
+        "Generates a story-by-story construction schedule from the live model (columns & walls, then beams & slab, per story) " +
+        "on a working-day calendar, with planned cost per task and a weekly cumulative cost curve (sample rates unless given). " +
+        "This is a planning baseline, not a CPM schedule.",
+      inputSchema: {
+        instance,
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD; default today."),
+        verticalDays: z.number().int().min(1).max(365).default(5).describe("Working days for columns & walls per story."),
+        horizontalDays: z.number().int().min(1).max(365).default(7).describe("Working days for beams & slab per story."),
+        lagDays: z.number().int().min(0).max(365).default(2).describe("Working days between floors."),
+        workingWeekdays: z.array(z.number().int().min(0).max(6)).min(1).default([1, 2, 3, 4, 5, 6]).describe("0=Sun ... 6=Sat."),
+        holidays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).default([]),
+        rates: z.record(z.string(), z.number().min(0)).optional().describe("Unit rates as in etabs_get_boq; omit for sample rates."),
+        currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),
+      },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, startDate, verticalDays, horizontalDays, lagDays, workingWeekdays, holidays, rates, currency }) => {
+      const client = resolver.client(pid);
+      const [geometry, sections] = await Promise.all([
+        cached(client, "geometry", () => client.geometry()),
+        cached(client, "sections", () => client.sections()),
+      ]);
+      const settings = { ...defaultScheduleSettings(), ...(startDate ? { startDate } : {}), verticalDays, horizontalDays, lagDays, workingWeekdays, holidays };
+      const tasks = generateSchedule(geometry, settings);
+      const elements = computeElementQuantities(geometry, sections);
+      const sample = defaultRateTable(buildBoq(elements), undefined, currency?.toUpperCase() ?? "INR");
+      const table = rates ? { currency: currency?.toUpperCase() ?? "INR", rates, isSample: false } : sample;
+      const costs = taskCosts(tasks, elements, table);
+      const curve = costCurve(tasks, costs, settings);
+      const weekly = curve.filter((_, i) => i % 7 === 6 || i === curve.length - 1).map((p) => ({ date: isoFromTime(p.t), cumulativeCost: Math.round(p.cumulative) }));
+      return {
+        model: geometry.model.fileName,
+        settings,
+        span: scheduleSpan(tasks),
+        currency: table.currency,
+        ratesAreSamples: table.isSample,
+        tasks: tasks.map(({ elements: els, ...t }) => ({ ...t, objects: els.length, cost: Math.round(costs.get(t.id) ?? 0) })),
+        weeklyCumulativeCost: weekly,
       };
     }),
   );

@@ -5,6 +5,7 @@ export * from "./connection.js";
 export * from "./units.js";
 export * from "./quantities.js";
 export * from "./costing.js";
+export * from "./schedule.js";
 
 /** Semantic version of this client package; kept equal to /VERSION. */
-export const CLIENT_VERSION = "0.3.0";
+export const CLIENT_VERSION = "0.4.0";

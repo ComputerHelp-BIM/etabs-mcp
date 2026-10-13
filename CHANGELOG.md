@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-10-13
+
+### Added
+
+- **4D simulation**: story-by-story construction schedule generated from the model (columns & walls, then beams &
+  slab, with a lag between floors) on a working-day calendar with holidays; editable task dates with forward
+  re-sequencing; CSV export and date import; playback in the 3D view (future elements hidden, elements under
+  construction highlighted) with built/under-construction counts.
+- **4D + 5D**: cost per task and a planned-value S-curve; planned cost to date during playback.
+- Gantt chart and line chart components (accessible SVG, validated colours, hover/keyboard tooltips).
+- MCP tool `etabs_generate_schedule`; shared client module `schedule`. See `docs/4d-simulation.md`.
+
 ## [0.3.0] - 2026-10-13
 
 ### Added
