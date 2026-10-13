@@ -3,6 +3,7 @@ name: Plugin
 # Builds the ETABS plugin against the real, signed ETABS API, verifies it and packages it.
 #   - push to dev/main, pull requests, manual runs: build + checks + downloadable artifact (30 days)
 #   - tag vMAJOR.MINOR.PATCH (must equal /VERSION): additionally publishes a GitHub Release
+#   - manual run on dev/main with "release" ticked: creates tag v<VERSION> on that commit and the Release
 # ETABS API source (see docs/ci-cd.md):
 #   - default: the pinned reference copy from scripts/fetch-etabs-api.sh on a GitHub-hosted runner
 #   - repository variable ETABS_RUNNER_LABEL set: a self-hosted Windows runner with ETABS installed,
@@ -14,6 +15,11 @@ on:
     tags: ["v*.*.*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish GitHub Release v<VERSION> from this commit (dev or main only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -128,12 +134,16 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
-    if: github.ref_type == 'tag'
+    if: >-
+      github.ref_type == 'tag' ||
+      (github.event_name == 'workflow_dispatch' && inputs.release &&
+       (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       VERSION: ${{ needs.build.outputs.version }}
+      TAG: v${{ needs.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -154,10 +164,29 @@ jobs:
             echo
             echo "### Install"
             echo
-            echo "Download \`EtabsBridgePlugin-$VERSION.zip\`, unblock it (right-click > Properties > Unblock), extract, then register the DLL for your ETABS framework in **Tools > Add/Show Plugins** (plugin name \`EtabsBridgePlugin\`). Details: \`README.txt\` in the zip and [docs/install-plugin.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/install-plugin.md)."
+            echo "Download \`EtabsBridgePlugin-$VERSION.zip\`, unblock it (right-click > Properties > Unblock), extract, then register the DLL for your ETABS framework in **Tools > Add/Show Plugins** (plugin name \`EtabsBridgePlugin\`). Details: \`README.txt\` in the zip and [docs/install-plugin.md](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/install-plugin.md)."
             echo
             echo "Web app: https://etabs-bridge.vercel.app"
           } >> notes.md
+
+      - name: Check the tag (manual releases create it on this commit)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REF_JSON="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" 2>/dev/null)" || REF_JSON=""
+          if [[ -n "$REF_JSON" ]]; then
+            COMMIT="$(jq -r '.object.sha' <<< "$REF_JSON")"
+            if [[ "$(jq -r '.object.type' <<< "$REF_JSON")" == "tag" ]]; then
+              # Annotated tag: the ref points at a tag object; resolve it to its commit.
+              COMMIT="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$COMMIT" --jq '.object.sha')"
+            fi
+            if [[ "$COMMIT" != "$GITHUB_SHA" ]]; then
+              echo "::error::$TAG already exists on $COMMIT, not on this commit $GITHUB_SHA. Bump VERSION for a new release."; exit 1
+            fi
+            echo "$TAG already points at this commit."
+          else
+            echo "$TAG does not exist yet; the release step creates it on $GITHUB_SHA."
+          fi
 
       - name: Publish (or update) the release
         env:
@@ -165,10 +194,11 @@ jobs:
         run: |
           PRERELEASE=()
           if [[ "$VERSION" == 0.* ]]; then PRERELEASE=(--prerelease); fi
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
-            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag "${PRERELEASE[@]}" \
+            # --target creates the tag on this commit when it does not exist yet (manual release).
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" "${PRERELEASE[@]}" \
               --title "ETABS Bridge $VERSION" --notes-file notes.md
           fi

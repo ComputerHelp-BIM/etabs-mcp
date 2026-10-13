@@ -3,7 +3,7 @@
 | What | Where | When | Result |
 | --- | --- | --- | --- |
 | **CI** (`.github/workflows/ci.yml`) | GitHub, Linux | push to `dev`/`main`, pull requests | C# tests, stub type-check, version check, TS typecheck/tests/build |
-| **Plugin** (`.github/workflows/plugin.yml`) | GitHub, Windows (or your ETABS PC) | push to `dev`/`main`, pull requests, manual, `v*` tags | plugin built against the signed ETABS API, checked, zipped; on a tag also a GitHub Release |
+| **Plugin** (`.github/workflows/plugin.yml`) | GitHub, Windows (or your ETABS PC) | push to `dev`/`main`, pull requests, manual, `v*` tags | plugin built against the signed ETABS API, checked, zipped; on a tag or a manual *release* run also a GitHub Release |
 | **Web app** | Vercel (`etabs-bridge`) | push to any branch | `dev` → production at https://etabs-bridge.vercel.app; other branches → previews. See [deploy-vercel.md](deploy-vercel.md) |
 
 ## The plugin workflow
@@ -22,8 +22,10 @@
 6. **Package.** `EtabsBridgePlugin-<version>.zip` containing both DLLs with their `.pdb` files, `README.txt`
    (install steps and build provenance) and `SHA256SUMS.txt`, plus `EtabsBridgePlugin-<version>.zip.sha256`.
    It is uploaded as a workflow **artifact** for 30 days.
-7. **Release** (tags only). Creates the GitHub Release `v<version>` with the zip and checksum, and release notes
-   taken from that version's section in `CHANGELOG.md`. `0.x` versions are marked *pre-release*.
+7. **Release** (a `v*` tag, or a manual run with *release* ticked). Creates the GitHub Release `v<version>` with the
+   zip and checksum, and release notes taken from that version's section in `CHANGELOG.md`. A manual release
+   creates the tag on the commit it built, and refuses if that tag already exists on another commit. `0.x` versions
+   are marked *pre-release*.
 
 ### Getting a build
 
@@ -39,7 +41,8 @@ refuse to load a blocked plugin DLL.
    `SERVER_VERSION`); `npm run check-versions` confirms they agree.
 2. Add the `## [X.Y.Z] - date` section to `CHANGELOG.md`.
 3. Push to `dev` and wait for CI and *Plugin* to pass.
-4. Tag that commit and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. Either **Actions → Plugin → Run workflow**, branch `dev`, tick **release** (one click, no local git needed), or
+   tag the commit yourself: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
 ## Where the ETABS API comes from
 

@@ -12,7 +12,8 @@ All notable changes to this project are documented here. The format follows
 - **Plugin CI/CD** (`.github/workflows/plugin.yml`): builds the plugin on Windows against CSI's signed ETABS API,
   runs the C# tests on Windows, packages `EtabsBridgePlugin-<version>.zip` (both frameworks, symbols, README with
   build provenance, SHA-256 sums) as an artifact, and publishes a GitHub Release for `v*` tags. A self-hosted runner
-  with ETABS can be switched on with repository variables. See `docs/ci-cd.md`.
+  with ETABS can be switched on with repository variables; a manual run with *release* ticked publishes a release
+  without a local git tag. See `docs/ci-cd.md`.
 - **ETABS API contract check** (`scripts/check-etabs-api.sh`, `plugin/tools/ApiContractCheck`): every by-name API
   call (59 method paths, 123 output names) is checked against the real `ETABSv1.dll` metadata.
 - `scripts/fetch-etabs-api.sh`: a SHA-256-pinned reference copy of `ETABSv1.dll` for builds without ETABS.
