@@ -1,0 +1,36 @@
+<Project>
+  <!--
+    Shared build settings for every C# project in the ETABS Bridge solution.
+
+    Version: kept in sync with /VERSION at the repo root (semantic versioning:
+    MAJOR.MINOR.PATCH). scripts/check-versions.mjs fails CI if they drift.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Authors>ComputerHelp-BIM</Authors>
+    <Product>ETABS Bridge</Product>
+    <Copyright>ComputerHelp-BIM</Copyright>
+
+    <LangVersion>10.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: missing XML comment on public member. Documented where it matters, not on every DTO property. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Location of the ETABS API assembly (ETABSv1.dll). Override on the command line:
+      dotnet build -p:EtabsInstallDir="D:\CSI\ETABS 22"
+
+    UseEtabsStub=true compiles against a minimal stub of ETABSv1 instead of the
+    real DLL. It exists ONLY so CI (Linux, no ETABS) can type-check the adapter
+    and plugin. Stub builds are not deployable: the stub is not strong-named and
+    only declares the members this project calls.
+  -->
+  <PropertyGroup>
+    <EtabsInstallDir Condition="'$(EtabsInstallDir)' == ''">C:\Program Files\Computers and Structures\ETABS 22</EtabsInstallDir>
+    <UseEtabsStub Condition="'$(UseEtabsStub)' == ''">false</UseEtabsStub>
+  </PropertyGroup>
+</Project>

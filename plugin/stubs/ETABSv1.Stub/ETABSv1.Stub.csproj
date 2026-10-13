@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    COMPILE-ONLY stand-in for the real ETABSv1.dll, used when UseEtabsStub=true so CI
+    (Linux, no ETABS licence) can type-check EtabsBridge.Etabs and the plugin.
+
+    It declares ONLY the API members this repository calls, with the signatures from
+    the CSI OAPI documentation (CSI API ETABS v1.chm). If a real build fails where the
+    stub build passes, the real DLL is authoritative: fix the adapter AND this stub.
+
+    Never deploy anything built against this stub.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>ETABSv1</AssemblyName>
+    <RootNamespace>ETABSv1</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    Import this file in any project that calls the ETABS API. It references
+    either the real ETABSv1.dll from the ETABS install folder (default) or the
+    compile-only stub (UseEtabsStub=true, CI only).
+
+    Private=false: ETABS loads its own ETABSv1.dll into the process, so the
+    plugin must never ship a copy (a second copy causes type-identity errors).
+  -->
+  <ItemGroup Condition="'$(UseEtabsStub)' != 'true'">
+    <Reference Include="ETABSv1">
+      <HintPath>$(EtabsInstallDir)\ETABSv1.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseEtabsStub)' == 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)stubs\ETABSv1.Stub\ETABSv1.Stub.csproj" Private="false" />
+  </ItemGroup>
+
+  <Target Name="WarnEtabsStub" BeforeTargets="Build" Condition="'$(UseEtabsStub)' == 'true'">
+    <Message Importance="high" Text="$(MSBuildProjectName): built against the ETABSv1 STUB. Output is for type-checking only and must not be deployed." />
+  </Target>
+
+  <Target Name="CheckEtabsDll" BeforeTargets="ResolveAssemblyReferences" Condition="'$(UseEtabsStub)' != 'true' And !Exists('$(EtabsInstallDir)\ETABSv1.dll')">
+    <Error Text="ETABSv1.dll not found in '$(EtabsInstallDir)'. Pass -p:EtabsInstallDir=&lt;your ETABS folder&gt;, or -p:UseEtabsStub=true for a type-check-only build." />
+  </Target>
+</Project>

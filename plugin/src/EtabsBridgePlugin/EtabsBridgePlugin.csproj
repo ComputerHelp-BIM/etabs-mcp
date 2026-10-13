@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The ETABS plugin. Produces ONE self-contained DLL (EtabsBridgePlugin.dll):
+    the Core and Etabs sources are compiled in, so ETABS never has to resolve
+    dependent assemblies from the plugin folder.
+
+    Register in ETABS: Tools > Add/Show Plugins...
+      Plugin Name : EtabsBridgePlugin   (namespace that contains cPlugin)
+      Path        : ...\bin\Release\<framework>\EtabsBridgePlugin.dll
+
+    Choose the framework folder that matches your ETABS: see docs/install-plugin.md.
+  -->
+  <PropertyGroup>
+    <EtabsTargetFrameworks Condition="'$(EtabsTargetFrameworks)' == ''">net48;net8.0-windows</EtabsTargetFrameworks>
+    <TargetFrameworks>$(EtabsTargetFrameworks)</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>EtabsBridgePlugin</RootNamespace>
+    <AssemblyName>EtabsBridgePlugin</AssemblyName>
+    <!-- Linked Core sources reference InternalsVisibleTo for the test assembly; harmless here. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\EtabsBridge.Core\**\*.cs" Exclude="..\EtabsBridge.Core\obj\**;..\EtabsBridge.Core\bin\**" LinkBase="Linked\Core" />
+    <Compile Include="..\EtabsBridge.Etabs\**\*.cs" Exclude="..\EtabsBridge.Etabs\obj\**;..\EtabsBridge.Etabs\bin\**" LinkBase="Linked\Etabs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <Import Project="..\..\EtabsApi.targets" />
+
+</Project>

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet:
+    name: C# core tests + plugin type-check (ETABSv1 stub)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Unit + contract tests
+        run: dotnet test plugin/tests/EtabsBridge.Core.Tests --configuration Release
+      - name: Type-check adapter and plugin against the ETABSv1 stub (not deployable)
+        run: dotnet build plugin/EtabsBridge.sln --configuration Release -p:UseEtabsStub=true
+
+  node:
+    name: TypeScript packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Use npm 11 (npm 10.9 has a workspace peer-resolution bug)
+        run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run check-versions
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

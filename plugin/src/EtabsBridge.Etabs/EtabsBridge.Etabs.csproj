@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    EtabsBridge.Etabs: the ONLY code that calls ETABSv1 directly.
+      * EtabsApiModel  - IEtabsModel adapter over cSapModel
+      * EtabsConnector - attach to a running ETABS by process ID (for DraftWin/external tools)
+
+    The plugin compiles these sources into its own single DLL, so this assembly is
+    meant for external hosts such as DraftWin (VB.NET):
+      Dim sap = EtabsConnector.AttachByProcessId(pid)
+      Dim geo = New GeometryService(New EtabsApiModel(sap), pid).GetSnapshot()
+
+    Target frameworks: override with -p:EtabsTargetFrameworks=net48 (ETABS <= 21 era)
+    or -p:EtabsTargetFrameworks=net8.0-windows if your ETABSv1.dll targets one only.
+  -->
+  <PropertyGroup>
+    <EtabsTargetFrameworks Condition="'$(EtabsTargetFrameworks)' == ''">net48;net8.0-windows</EtabsTargetFrameworks>
+    <TargetFrameworks>$(EtabsTargetFrameworks)</TargetFrameworks>
+    <RootNamespace>EtabsBridge.Etabs</RootNamespace>
+    <AssemblyName>EtabsBridge.Etabs</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- Allows building the net8.0-windows target on Linux CI (stub builds only). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EtabsBridge.Core\EtabsBridge.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <Import Project="..\..\EtabsApi.targets" />
+
+</Project>

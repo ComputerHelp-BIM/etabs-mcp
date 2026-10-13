@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{D184B054-9542-40EC-915A-36622430E701}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtabsBridge.Core", "src\EtabsBridge.Core\EtabsBridge.Core.csproj", "{73060A83-33C6-4E42-914B-61106D780CAF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtabsBridge.Etabs", "src\EtabsBridge.Etabs\EtabsBridge.Etabs.csproj", "{BFDD346E-6436-43D6-BABB-5C68673BBF7E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtabsBridgePlugin", "src\EtabsBridgePlugin\EtabsBridgePlugin.csproj", "{BE3AAAE4-2B61-4E4E-9EE7-6F6969A320AE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0D87F5F6-292C-42D9-96A7-31B54AC5DF4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtabsBridge.Core.Tests", "tests\EtabsBridge.Core.Tests\EtabsBridge.Core.Tests.csproj", "{059E3036-8470-4784-BBE9-A9F98E38EB9C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{73060A83-33C6-4E42-914B-61106D780CAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73060A83-33C6-4E42-914B-61106D780CAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73060A83-33C6-4E42-914B-61106D780CAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73060A83-33C6-4E42-914B-61106D780CAF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFDD346E-6436-43D6-BABB-5C68673BBF7E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFDD346E-6436-43D6-BABB-5C68673BBF7E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFDD346E-6436-43D6-BABB-5C68673BBF7E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFDD346E-6436-43D6-BABB-5C68673BBF7E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE3AAAE4-2B61-4E4E-9EE7-6F6969A320AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE3AAAE4-2B61-4E4E-9EE7-6F6969A320AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE3AAAE4-2B61-4E4E-9EE7-6F6969A320AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE3AAAE4-2B61-4E4E-9EE7-6F6969A320AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{059E3036-8470-4784-BBE9-A9F98E38EB9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{059E3036-8470-4784-BBE9-A9F98E38EB9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{059E3036-8470-4784-BBE9-A9F98E38EB9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{059E3036-8470-4784-BBE9-A9F98E38EB9C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{73060A83-33C6-4E42-914B-61106D780CAF} = {D184B054-9542-40EC-915A-36622430E701}
+		{BFDD346E-6436-43D6-BABB-5C68673BBF7E} = {D184B054-9542-40EC-915A-36622430E701}
+		{BE3AAAE4-2B61-4E4E-9EE7-6F6969A320AE} = {D184B054-9542-40EC-915A-36622430E701}
+		{059E3036-8470-4784-BBE9-A9F98E38EB9C} = {0D87F5F6-292C-42D9-96A7-31B54AC5DF4A}
+	EndGlobalSection
+EndGlobal

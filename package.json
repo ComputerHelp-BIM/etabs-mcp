@@ -1,0 +1,32 @@
+{
+  "name": "etabs-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ETABS plugin + local API, MCP server and sample web app for reading ETABS models.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "workspaces": [
+    "packages/client",
+    "apps/mock-bridge",
+    "apps/mcp-server",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20.19",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "build": "npm run build -w @etabs-bridge/client && npm run build -w @etabs-bridge/mock-bridge -w @etabs-bridge/mcp-server -w @etabs-bridge/web",
+    "typecheck": "npm run build -w @etabs-bridge/client && npm run typecheck --workspaces --if-present",
+    "test": "npm run build -w @etabs-bridge/client && npm run test --workspaces --if-present",
+    "check-versions": "node scripts/check-versions.mjs",
+    "mock": "npm run build -w @etabs-bridge/client -w @etabs-bridge/mock-bridge && npm run start -w @etabs-bridge/mock-bridge",
+    "dev:web": "npm run dev -w @etabs-bridge/web"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0",
+    "vitest": "^4.1.0"
+  }
+}

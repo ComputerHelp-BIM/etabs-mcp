@@ -1,0 +1,27 @@
+{
+  "name": "@etabs-bridge/mock-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mock ETABS Bridge serving a generated sample building on the same REST API (for development and tests without ETABS).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "etabs-mock-bridge": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@etabs-bridge/client": "0.1.0"
+  }
+}

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    EtabsBridge.Core: everything that does NOT need ETABS installed.
+      * DTOs (the JSON contract), JSON reader/writer
+      * geometry service (mapping/validation on top of the IEtabsModel port)
+      * reflective API invoker (RPC), HTTP server, CORS/auth, instance discovery
+
+    netstandard2.0 so it can be referenced from:
+      * the ETABS plugin (net48 for ETABS <= 21, net8.0-windows for ETABS 22+)
+      * DraftWin (VB.NET, .NET Framework 4.7.2+) without any adapter
+      * the unit tests (net8.0, runs on Linux CI)
+
+    It deliberately has ZERO NuGet dependencies: plugins are loaded into the
+    ETABS process, where ETABS.exe.config controls assembly binding. Shipping
+    e.g. System.Text.Json + its 7 dependencies into that process risks
+    FileLoadException version conflicts we cannot fix with binding redirects.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>EtabsBridge.Core</RootNamespace>
+    <AssemblyName>EtabsBridge.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EtabsBridge.Core.Tests" />
+  </ItemGroup>
+
+</Project>
