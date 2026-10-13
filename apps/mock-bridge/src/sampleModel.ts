@@ -214,7 +214,7 @@ export function createSampleModel(options: SampleModelOptions = {}): SampleModel
       isLocked: false,
       units,
       processId: options.processId ?? process.pid,
-      bridgeVersion: "0.5.0-mock",
+      bridgeVersion: "0.6.0-mock",
     },
     units,
     baseElevation: 0,

@@ -6,7 +6,7 @@
     MAJOR.MINOR.PATCH). scripts/check-versions.mjs fails CI if they drift.
   -->
   <PropertyGroup>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <Authors>ComputerHelp-BIM</Authors>
     <Product>ETABS Bridge</Product>
     <Copyright>ComputerHelp-BIM</Copyright>

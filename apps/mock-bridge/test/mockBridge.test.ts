@@ -92,6 +92,39 @@ describe("mock bridge over HTTP", () => {
     expect((await client.loads()).combinations.map((c) => c.name)).toContain("ENVELOPE");
   });
 
+  it("serves consistent synthetic results", async () => {
+    const status = await client.resultsStatus();
+    expect(status.cases.every((c) => c.status === "Finished")).toBe(true);
+
+    const base = await client.baseReactions({ cases: ["Dead", "Live", "EQX"], combos: ["1.5(D+L)", "ENVELOPE"] });
+    const fz = (n: string, step = "") => base.rows.find((r) => r.loadCase === n && r.stepType === step)!.fz;
+    expect(fz("Live")).toBeCloseTo(loadTakedown(bridge.model.loads, bridge.model.geometry).find((t) => t.pattern === "Live")!.total);
+    expect(fz("1.5(D+L)")).toBeCloseTo(1.5 * (fz("Dead") + fz("Live") + (await client.baseReactions({ cases: ["SDL"] })).rows[0]!.fz));
+    expect(fz("ENVELOPE", "Max")).toBeGreaterThanOrEqual(fz("ENVELOPE", "Min"));
+    expect(base.rows.find((r) => r.loadCase === "EQX")!.fx).toBeCloseTo(-bridge.model.loads.jointLoads.reduce((s, j) => s + j.f1, 0));
+    expect(base.warnings[0]).toMatch(/synthetic/);
+
+    const supports = await client.jointReactions({ cases: ["Dead"] });
+    expect(supports.rows.reduce((s, r) => s + r.f3, 0)).toBeCloseTo(fz("Dead"));
+
+    const drifts = await client.storyDrifts({ cases: ["EQX"] });
+    expect(drifts.rows.filter((r) => r.direction === "X")).toHaveLength(6);
+
+    const forces = await client.frameForces({ cases: ["Dead"], frame: "1" });
+    expect(forces.rows.map((r) => r.station)).toEqual([0, 2.25, 4.5]);
+
+    const paged = await client.jointDisplacements({ cases: ["EQX"], offset: 10, limit: 5 });
+    expect(paged.rows).toHaveLength(5);
+    expect(paged.totalRows).toBe(bridge.model.geometry.joints.length);
+
+    const unknown = await client.baseReactions({ cases: ["Nope"] });
+    expect(unknown.rows).toEqual([]);
+    expect(unknown.warnings.some((w) => w.includes("Nope"))).toBe(true);
+
+    await expect(client.storyDrifts({})).rejects.toMatchObject({ status: 400 });
+    expect((await client.concreteDesign({ limit: 3 })).rows).toHaveLength(3);
+  });
+
   it("serves database tables with paging and field selection", async () => {
     const { tables } = await client.tables();
     expect(tables.find((t) => t.key === "Story Definitions")?.isEmpty).toBe(false);

@@ -1,6 +1,21 @@
 import type { z } from "zod";
 import {
+  AnalysisStatusSchema,
   ApiCallResultSchema,
+  BaseReactionsSchema,
+  ConcreteDesignSchema,
+  FrameForcesSchema,
+  JointDisplacementsSchema,
+  JointReactionsSchema,
+  StoryDriftsSchema,
+  type AnalysisStatus,
+  type BaseReactionRow,
+  type ConcreteDesignRow,
+  type FrameForceRow,
+  type JointDisplacementRow,
+  type JointReactionRow,
+  type ResultRows,
+  type StoryDriftRow,
   ApiTypeDescriptionSchema,
   AreasResultSchema,
   ErrorBodySchema,
@@ -71,6 +86,14 @@ export interface BridgeClientOptions {
   validate?: boolean;
   /** Custom fetch (tests, proxies). Default globalThis.fetch. */
   fetch?: typeof fetch;
+}
+
+/** Cases and/or combinations to report results for, plus optional paging. */
+export interface ResultQuery {
+  cases?: string[];
+  combos?: string[];
+  offset?: number;
+  limit?: number;
 }
 
 export interface TableQuery {
@@ -147,6 +170,39 @@ export class BridgeClient {
   /** Load patterns, cases, combinations and assigned loads. Since bridge 0.5.0. */
   loads(): Promise<LoadsResult> {
     return this.request("GET", "/loads", LoadsResultSchema);
+  }
+
+  /** Analysis status of every load case, and the combination names. Since bridge 0.6.0. */
+  resultsStatus(): Promise<AnalysisStatus> {
+    return this.request("GET", "/results/status", AnalysisStatusSchema);
+  }
+
+  baseReactions(q: ResultQuery): Promise<ResultRows<BaseReactionRow>> {
+    return this.request("GET", `/results/base-reactions?${resultParams(q)}`, BaseReactionsSchema);
+  }
+
+  storyDrifts(q: ResultQuery): Promise<ResultRows<StoryDriftRow>> {
+    return this.request("GET", `/results/story-drifts?${resultParams(q)}`, StoryDriftsSchema);
+  }
+
+  /** All supports, or one joint. */
+  jointReactions(q: ResultQuery & { joint?: string }): Promise<ResultRows<JointReactionRow>> {
+    return this.request("GET", `/results/joint-reactions?${resultParams(q, { joint: q.joint })}`, JointReactionsSchema);
+  }
+
+  /** All joints (page it on large models), or one joint. */
+  jointDisplacements(q: ResultQuery & { joint?: string }): Promise<ResultRows<JointDisplacementRow>> {
+    return this.request("GET", `/results/joint-displacements?${resultParams(q, { joint: q.joint })}`, JointDisplacementsSchema);
+  }
+
+  /** One frame, or all frames (very large: always page it). */
+  frameForces(q: ResultQuery & { frame?: string }): Promise<ResultRows<FrameForceRow>> {
+    return this.request("GET", `/results/frame-forces?${resultParams(q, { frame: q.frame })}`, FrameForcesSchema);
+  }
+
+  /** Required reinforcement from ETABS concrete frame design. */
+  concreteDesign(page: { offset?: number; limit?: number } = {}): Promise<ResultRows<ConcreteDesignRow>> {
+    return this.request("GET", `/design/concrete?${resultParams(page)}`, ConcreteDesignSchema);
   }
 
   /** Catalogue of ETABS database tables (Display > Show Tables). */
@@ -235,4 +291,14 @@ export class BridgeClient {
     }
     return parsed.data;
   }
+}
+
+function resultParams(q: ResultQuery, extra: Record<string, string | undefined> = {}): string {
+  const params = new URLSearchParams();
+  if (q.cases?.length) params.set("cases", q.cases.join(","));
+  if (q.combos?.length) params.set("combos", q.combos.join(","));
+  if (q.offset !== undefined) params.set("offset", String(q.offset));
+  if (q.limit !== undefined) params.set("limit", String(q.limit));
+  for (const [k, v] of Object.entries(extra)) if (v) params.set(k, v);
+  return params.toString();
 }

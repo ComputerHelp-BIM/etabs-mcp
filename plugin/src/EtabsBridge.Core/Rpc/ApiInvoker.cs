@@ -132,7 +132,7 @@ namespace EtabsBridge.Core.Rpc
 
             MethodInfo method = SelectMethod(targetType, methodName, suppliedArgs, fullName);
 
-            if (!RpcPolicy.IsReadOnly(method.Name) && !_writesEnabled())
+            if (!RpcPolicy.IsReadOnly(objectPath.Length == 0 ? method.Name : objectPath + "." + method.Name) && !_writesEnabled())
             {
                 throw new BridgeException(
                     403,

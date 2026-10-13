@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { isOriginAllowed, type ApiTypeDescription } from "@etabs-bridge/client";
 import { registerInstance, unregisterInstance } from "@etabs-bridge/client/registry";
 import { createSampleModel, type SampleModel, type SampleModelOptions } from "./sampleModel.js";
+import { MOCK_RESULTS_WARNING, createSampleResults } from "./sampleResults.js";
 
 export interface MockBridgeOptions {
   /** 0 = pick a free port. Default 52780. */
@@ -63,6 +64,7 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
   let allowWrites = options.allowWrites ?? false;
   const latency = options.latencyMs ?? 0;
   const sections = new Map(model.geometry.frames.map((f) => [f.name, f.section]));
+  const results = createSampleResults(model);
 
   const delay = () => (latency > 0 ? new Promise((r) => setTimeout(r, latency)) : Promise.resolve());
 
@@ -81,6 +83,35 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
     "/geometry/areas": { GET: async () => (await delay(), { units: model.geometry.units, areas: model.geometry.areas }) },
     "/sections": { GET: async () => (await delay(), model.sections) },
     "/loads": { GET: async () => (await delay(), model.loads) },
+    "/results/status": {
+      GET: async () => (
+        await delay(),
+        {
+          isLocked: true,
+          cases: model.loads.cases.map((c) => ({ name: c.name, status: "Finished" })),
+          combinations: model.loads.combinations.map((c) => c.name),
+          warnings: [MOCK_RESULTS_WARNING],
+        }
+      ),
+    },
+    "/results/base-reactions": { GET: async (url) => (await delay(), resultPage(url, (c, k) => results.baseReactions(c, k))) },
+    "/results/story-drifts": { GET: async (url) => (await delay(), resultPage(url, (c, k) => results.storyDrifts(c, k))) },
+    "/results/joint-reactions": {
+      GET: async (url) => (await delay(), resultPage(url, (c, k) => results.jointReactions(c, k, url.searchParams.get("joint") || undefined))),
+    },
+    "/results/joint-displacements": {
+      GET: async (url) => (await delay(), resultPage(url, (c, k) => results.jointDisplacements(c, k, url.searchParams.get("joint") || undefined))),
+    },
+    "/results/frame-forces": {
+      GET: async (url) => (await delay(), resultPage(url, (c, k) => results.frameForces(c, k, url.searchParams.get("frame") || undefined))),
+    },
+    "/design/concrete": {
+      GET: async (url) => {
+        await delay();
+        const rows = results.concreteDesign();
+        return page(url, { units: model.geometry.units, cases: [], combinations: [], rows, warnings: [MOCK_RESULTS_WARNING] });
+      },
+    },
     "/tables": { GET: async () => (await delay(), { tables: model.tables }) },
     "/tables/data": { GET: async (url) => (await delay(), tableData(url)) },
     "/rpc/describe": { GET: async (url) => describe(url.searchParams.get("path") ?? "") },
@@ -108,6 +139,32 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
       offset: Math.min(offset, rows.length),
       rows: rows.slice(offset, offset + limit),
     };
+  }
+
+  function list(url: URL, name: string): string[] {
+    return [...new Set((url.searchParams.get(name) ?? "").split(",").map((x) => x.trim()).filter(Boolean))];
+  }
+
+  function page<T>(url: URL, r: { units: unknown; cases: string[]; combinations: string[]; rows: T[]; warnings: string[] }) {
+    const offset = nonNegative(url, "offset", 0);
+    const limit = nonNegative(url, "limit", Number.MAX_SAFE_INTEGER);
+    return { ...r, totalRows: r.rows.length, offset: Math.min(offset, r.rows.length), rows: r.rows.slice(offset, offset + limit) };
+  }
+
+  function resultPage<T>(url: URL, read: (cases: string[], combos: string[]) => { rows: T[]; unknown: string[] }) {
+    const cases = list(url, "cases");
+    const combos = list(url, "combos");
+    if (!cases.length && !combos.length) {
+      throw new HttpError(400, "BAD_REQUEST", "Select at least one load case (cases=...) or combination (combos=...). See /results/status.");
+    }
+    const { rows, unknown } = read(cases, combos);
+    return page(url, {
+      units: model.geometry.units,
+      cases,
+      combinations: combos,
+      rows,
+      warnings: [MOCK_RESULTS_WARNING, ...unknown.map((n) => `Results.Setup.SetCaseSelectedForOutput(${n}) returned 1.`)],
+    });
   }
 
   function nonNegative(url: URL, name: string, fallback: number): number {

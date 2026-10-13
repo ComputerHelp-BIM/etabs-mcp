@@ -147,6 +147,12 @@ namespace EtabsBridge.Core.Tests
         [InlineData("SetSection", false)]
         [InlineData("Delete", false)]
         [InlineData("getLower", false)]
+        [InlineData("Results.Setup.SetCaseSelectedForOutput", true)]
+        [InlineData("results.setup.DeselectAllCasesAndCombosForOutput", true)]
+        [InlineData("FrameObj.SetSection", false)]
+        [InlineData("FrameObj.GetSection", true)]
+        [InlineData("Results.BaseReact", true)]
+        [InlineData("ResultsX.SetThing", false)]
         public void ReadOnlyPolicy(string method, bool expected)
         {
             Assert.Equal(expected, RpcPolicy.IsReadOnly(method));

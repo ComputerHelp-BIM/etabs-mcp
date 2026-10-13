@@ -32,6 +32,12 @@ namespace EtabsBridge.Core.Tests.Fakes.FakeApi
 
         IFakePointObj PointObj { get; }
 
+        IFakeAnalyze Analyze { get; }
+
+        IFakeResults Results { get; }
+
+        IFakeDesignConcrete DesignConcrete { get; }
+
         string GetModelFilename(bool IncludePath = true);
 
         int GetVersion(ref string Version, ref double MyVersionNumber);
@@ -86,6 +92,12 @@ namespace EtabsBridge.Core.Tests.Fakes.FakeApi
         public IFakeAreaObj AreaObj { get; } = new FakeAreaObj();
 
         public IFakePointObj PointObj { get; } = new FakePointObj();
+
+        public IFakeAnalyze Analyze { get; } = new FakeAnalyze();
+
+        public IFakeResults Results { get; } = new FakeResults();
+
+        public IFakeDesignConcrete DesignConcrete { get; } = new FakeDesignConcrete();
 
         public string GetModelFilename(bool IncludePath = true) => IncludePath ? @"C:\M\Sample.EDB" : "Sample.EDB";
 

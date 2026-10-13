@@ -59,6 +59,13 @@ describe("MCP server against the mock bridge", () => {
         "etabs_get_boq",
         "etabs_generate_schedule",
         "etabs_get_loads",
+        "etabs_get_analysis_status",
+        "etabs_get_base_reactions",
+        "etabs_get_story_drifts",
+        "etabs_get_joint_reactions",
+        "etabs_get_joint_displacements",
+        "etabs_get_frame_forces",
+        "etabs_get_concrete_design",
         "etabs_list_tables",
         "etabs_get_table",
         "etabs_describe_api",
@@ -146,6 +153,43 @@ describe("MCP server against the mock bridge", () => {
     const areas = await call(client, "etabs_get_loads", { include: "areaUniform", pattern: "Live", limit: 10 });
     expect(areas.json.total).toBe(72);
     expect(areas.json.returned).toBe(10);
+  });
+
+  it("reads analysis results", async () => {
+    const status = await call(client, "etabs_get_analysis_status");
+    expect(status.json.isLocked).toBe(true);
+    expect(status.json.combinations).toContain("ENVELOPE");
+
+    const base = await call(client, "etabs_get_base_reactions", { cases: ["Dead"], combos: ["ENVELOPE"] });
+    expect(base.json.rows.map((r: { stepType: string }) => r.stepType)).toEqual(["", "Max", "Min"]);
+
+    const drifts = await call(client, "etabs_get_story_drifts", { cases: ["EQX"] });
+    expect(drifts.json.envelope).toHaveLength(6);
+    expect(drifts.json.maximum.direction).toBe("X");
+    expect(drifts.json.rows).toBeUndefined();
+
+    const forces = await call(client, "etabs_get_frame_forces", { cases: ["Dead"], frame: "1" });
+    expect(forces.json.rows).toHaveLength(3);
+
+    const reactions = await call(client, "etabs_get_joint_reactions", { combos: ["1.5(D+L)"], limit: 5 });
+    expect(reactions.json.rows).toHaveLength(5);
+    expect(reactions.json.totalRows).toBe(20);
+
+    const noSelection = await call(client, "etabs_get_base_reactions", {});
+    expect(noSelection.isError).toBe(true);
+    expect(noSelection.text).toMatch(/BAD_REQUEST/);
+  });
+
+  it("summarises concrete design and feeds design rebar into the BOQ", async () => {
+    const design = await call(client, "etabs_get_concrete_design", { limit: 1000 });
+    expect(design.json.items.length).toBeGreaterThan(100);
+    expect(design.json.items[0].requiredRebarKg).toBeGreaterThan(0);
+
+    const ratioBoq = await call(client, "etabs_get_boq");
+    const designBoq = await call(client, "etabs_get_boq", { useDesignRebar: true });
+    expect(designBoq.json.rebarFromDesign.frames).toBeGreaterThan(100);
+    const rebar = (r: typeof ratioBoq) => r.json.lines.filter((l: { item: string }) => l.item === "Reinforcement").reduce((s: number, l: { quantity: number }) => s + l.quantity, 0);
+    expect(rebar(designBoq)).not.toBeCloseTo(rebar(ratioBoq));
   });
 
   it("validates tool input", async () => {

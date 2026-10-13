@@ -76,6 +76,7 @@ These points could not be verified without ETABS and are the most likely to need
 | 3 | ETABS loads the DLL from the framework folder you picked | Try the other framework folder |
 | 4 | While the window is open, is the ETABS UI usable or locked? | Both are acceptable for reading; tell us which, because it decides how live editing will work |
 | 5 | `GET /api/v1/geometry` returns your stories, frames and areas | Send the error message: it names the failing API call and return code |
+| 5d | After analysis: `GET /api/v1/results/status`, then `/results/base-reactions?cases=Dead` | Send the `warnings`; they name any results getter that differs |
 | 5c | `GET /api/v1/loads` lists your patterns, combinations and assigned loads | Send the `warnings` array |
 | 5b | `GET /api/v1/sections` lists your materials and sections with dimensions | Send the `warnings` array: each line names the getter that is missing or failed |
 | 6 | Port binding works without "Run as administrator" | Send the plugin log line; an http.sys URL ACL may be needed |

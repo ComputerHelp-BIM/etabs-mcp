@@ -80,9 +80,10 @@ check against DNS rebinding, a body size limit, and a write opt-in. The token re
 **Contract drift is a test failure.** C# writes `contract/fixtures/*.json`. The C# tests require byte-identical output and
 the TypeScript tests validate the same files with the zod schemas.
 
-## Known limits (v0.2.0)
+## Known limits (v0.6.0)
 
-- Loads and results are reachable through `/tables` and `/rpc` but have no typed endpoints yet (see the roadmap in the README).
+- Results cover base reactions, drifts, joint reactions/displacements, frame forces and concrete design; modal,
+  response-spectrum detail, shell stresses and steel design are reachable through `/tables` and `/rpc`.
 - Section Designer, non-prismatic and auto-select sections have no dimensions; the solid view draws them with a
   marked placeholder size.
 - Per-object API calls (labels, restraints, orientation) make very large models (100k+ objects) take seconds;

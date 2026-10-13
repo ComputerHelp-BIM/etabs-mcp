@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import {
   BridgeError,
   computeElementQuantities,
+  designRebarKg,
   summarizeGeometry,
   type AreaObject,
   type AreaSection,
@@ -21,6 +22,7 @@ import { ApiConsole } from "./ApiConsole";
 import { BoqView } from "./BoqView";
 import { FourDView } from "./FourDView";
 import { LoadsView } from "./LoadsView";
+import { ResultsView } from "./ResultsView";
 import { explain } from "./ConnectPanel";
 import { DataTable, type Column } from "./DataTable";
 import type { Selection } from "./ModelViewer";
@@ -40,6 +42,7 @@ const TABS = [
   "Sections",
   "Materials",
   "Loads",
+  "Results",
   "BOQ & Cost",
   "4D Simulation",
   "Database tables",
@@ -70,14 +73,17 @@ export function Workspace({ client, onDisconnect }: Props) {
   );
   const modelKey = geometry.data ? geometry.data.model.filePath || geometry.data.model.fileName || "unsaved" : "unsaved";
   const [project, updateProject, replaceProject] = useProject(modelKey);
+  // Concrete design results, only when the BOQ should use them (0.6.0).
+  const design = useAsync(project.useDesignRebar ? () => client.concreteDesign() : null, [client, project.useDesignRebar]);
   const elements = useMemo(() => {
     if (!geometry.data || !sections) return null;
     try {
-      return computeElementQuantities(geometry.data, sections, { settings: project.quantitySettings });
+      const designKg = project.useDesignRebar && design.data ? designRebarKg(design.data.rows, geometry.data, sections).kgByFrame : undefined;
+      return computeElementQuantities(geometry.data, sections, { settings: project.quantitySettings, designRebarKg: designKg });
     } catch {
       return null; // e.g. unknown unit system; the BOQ tab explains
     }
-  }, [geometry.data, sections, project.quantitySettings]);
+  }, [geometry.data, sections, project.quantitySettings, project.useDesignRebar, design.data]);
   const [tab, setTab] = useState<Tab>("3D view");
   const [selection, setSelection] = useState<Selection>(null);
   const g = geometry.data;
@@ -123,7 +129,7 @@ export function Workspace({ client, onDisconnect }: Props) {
             className={t === tab ? "active" : undefined}
             onClick={() => {
               setTab(t);
-              if (t === "Loads") setWantLoads(true);
+              if (t === "Loads" || t === "Results") setWantLoads(true);
             }}
           >
             {t}
@@ -176,6 +182,9 @@ export function Workspace({ client, onDisconnect }: Props) {
           ) : (
             <LoadsView loads={loadsState.data ?? null} loading={loadsState.status !== "success"} geometry={g} />
           ))}
+        {g && tab === "Results" && (
+          <ResultsView client={client} geometry={g} sections={sections} loads={loadsState.data ?? null} project={project} update={updateProject} />
+        )}
         {g && tab === "BOQ & Cost" &&
           (elements ? (
             <BoqView

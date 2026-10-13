@@ -296,6 +296,74 @@ export const LoadsResultSchema = z.object({
   warnings: z.array(z.string()),
 });
 
+// ---- Results & design (0.6.0). Values in the model's present units.
+
+export const CaseStatusSchema = z.object({ name: z.string(), status: z.enum(["NotRun", "CouldNotStart", "NotFinished", "Finished", "Unknown"]) });
+export const AnalysisStatusSchema = z.object({
+  isLocked: z.boolean(),
+  cases: z.array(CaseStatusSchema),
+  combinations: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+
+const step = { loadCase: z.string(), stepType: z.string(), stepNum: z.number() };
+export const BaseReactionRowSchema = z.object({ ...step, fx: z.number(), fy: z.number(), fz: z.number(), mx: z.number(), my: z.number(), mz: z.number() });
+export const StoryDriftRowSchema = z.object({
+  story: z.string(),
+  ...step,
+  direction: z.string(),
+  /** Drift ratio. */
+  drift: z.number(),
+  label: z.string(),
+  x: z.number(),
+  y: z.number(),
+  z: z.number(),
+});
+export const JointReactionRowSchema = z.object({ joint: z.string(), ...step, f1: z.number(), f2: z.number(), f3: z.number(), m1: z.number(), m2: z.number(), m3: z.number() });
+export const JointDisplacementRowSchema = z.object({ joint: z.string(), ...step, u1: z.number(), u2: z.number(), u3: z.number(), r1: z.number(), r2: z.number(), r3: z.number() });
+export const FrameForceRowSchema = z.object({
+  frame: z.string(),
+  station: z.number(),
+  ...step,
+  p: z.number(),
+  v2: z.number(),
+  v3: z.number(),
+  t: z.number(),
+  m2: z.number(),
+  m3: z.number(),
+});
+export const ConcreteDesignRowSchema = z.object({
+  frame: z.string(),
+  kind: z.enum(["Beam", "Column"]),
+  location: z.number(),
+  topArea: z.number().nullable(),
+  bottomArea: z.number().nullable(),
+  longitudinalArea: z.number().nullable(),
+  shearAreaPerLength: z.number().nullable(),
+  ratio: z.number().nullable(),
+  combo: z.string(),
+});
+
+/** Page of result rows (same envelope for every results endpoint). */
+export function resultRowsSchema<T extends z.ZodType>(row: T) {
+  return z.object({
+    units: UnitsInfoSchema,
+    cases: z.array(z.string()),
+    combinations: z.array(z.string()),
+    totalRows: z.number().int(),
+    offset: z.number().int(),
+    rows: z.array(row),
+    warnings: z.array(z.string()),
+  });
+}
+
+export const BaseReactionsSchema = resultRowsSchema(BaseReactionRowSchema);
+export const StoryDriftsSchema = resultRowsSchema(StoryDriftRowSchema);
+export const JointReactionsSchema = resultRowsSchema(JointReactionRowSchema);
+export const JointDisplacementsSchema = resultRowsSchema(JointDisplacementRowSchema);
+export const FrameForcesSchema = resultRowsSchema(FrameForceRowSchema);
+export const ConcreteDesignSchema = resultRowsSchema(ConcreteDesignRowSchema);
+
 export const TableInfoSchema = z.object({
   key: z.string(),
   name: z.string(),
@@ -385,6 +453,15 @@ export type FramePointLoad = z.infer<typeof FramePointLoadSchema>;
 export type AreaUniformLoad = z.infer<typeof AreaUniformLoadSchema>;
 export type JointLoad = z.infer<typeof JointLoadSchema>;
 export type LoadsResult = z.infer<typeof LoadsResultSchema>;
+export type CaseStatus = z.infer<typeof CaseStatusSchema>;
+export type AnalysisStatus = z.infer<typeof AnalysisStatusSchema>;
+export type BaseReactionRow = z.infer<typeof BaseReactionRowSchema>;
+export type StoryDriftRow = z.infer<typeof StoryDriftRowSchema>;
+export type JointReactionRow = z.infer<typeof JointReactionRowSchema>;
+export type JointDisplacementRow = z.infer<typeof JointDisplacementRowSchema>;
+export type FrameForceRow = z.infer<typeof FrameForceRowSchema>;
+export type ConcreteDesignRow = z.infer<typeof ConcreteDesignRowSchema>;
+export type ResultRows<T> = { units: UnitsInfo; cases: string[]; combinations: string[]; totalRows: number; offset: number; rows: T[]; warnings: string[] };
 export type TableInfo = z.infer<typeof TableInfoSchema>;
 export type TablesResult = z.infer<typeof TablesResultSchema>;
 export type TableData = z.infer<typeof TableDataSchema>;

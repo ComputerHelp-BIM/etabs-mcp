@@ -96,6 +96,13 @@ export function BoqView({ modelName, storyOrder, elements, project, update, repl
         </p>
       )}
 
+      {project.useDesignRebar && (
+        <p className="muted small">
+          Reinforcement uses ETABS concrete design results for designed frames ({elements.filter((e) => e.rebarSource === "design").length} objects);
+          ratios elsewhere. Change this in Results › Concrete design.
+        </p>
+      )}
+
       <div className="tiles">
         <Tile label={`Total cost (${table.currency})`} value={compact(summary.total)} />
         <Tile label="Concrete (m³)" value={compact(totals.concrete)} />

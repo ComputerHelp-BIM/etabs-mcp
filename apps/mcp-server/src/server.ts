@@ -11,6 +11,8 @@ import {
   costCurve,
   defaultScheduleSettings,
   describeCombination,
+  designRebarKg,
+  driftProfile,
   generateSchedule,
   isoFromTime,
   loadTakedown,
@@ -30,7 +32,7 @@ import {
 import { ConnectionError, type ConnectionResolver } from "./connection.js";
 
 export const SERVER_NAME = "etabs-bridge";
-export const SERVER_VERSION = "0.5.0";
+export const SERVER_VERSION = "0.6.0";
 
 export interface ServerOptions {
   resolver: ConnectionResolver;
@@ -47,6 +49,9 @@ const instance = z
 const offset = z.number().int().min(0).default(0).describe("Index of the first item to return.");
 const limit = (max: number, dflt: number) => z.number().int().min(1).max(max).default(dflt).describe(`Items per page (max ${max}).`);
 const story = z.string().optional().describe('Only objects on this story, e.g. "Story3".');
+
+const cases = z.array(z.string()).optional().describe("Load case names (see etabs_get_analysis_status).");
+const combos = z.array(z.string()).optional().describe("Load combination names.");
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
@@ -301,17 +306,22 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
           .optional()
           .describe("Unit rates by rate key (concrete:<grade>, formwork:<Column|Beam|Slab|Wall|Brace|Other>, rebar, steel:<grade>)."),
         currency: z.string().regex(/^[A-Za-z]{3}$/).optional().describe("ISO currency code for the given rates, e.g. INR."),
+        useDesignRebar: z
+          .boolean()
+          .default(false)
+          .describe("Use ETABS concrete design required steel for designed frames (needs an analysed and designed model); ratios elsewhere."),
       },
       annotations: READ_ONLY,
     },
-    safe(async ({ instance: pid, groupBy, rebarRatios, rates, currency }) => {
+    safe(async ({ instance: pid, groupBy, rebarRatios, rates, currency, useDesignRebar }) => {
       const client = resolver.client(pid);
       const [geometry, sections] = await Promise.all([
         cached(client, "geometry", () => client.geometry()),
         cached(client, "sections", () => client.sections()),
       ]);
       const settings = { ...DEFAULT_QUANTITY_SETTINGS, rebarRatios: { ...DEFAULT_QUANTITY_SETTINGS.rebarRatios, ...rebarRatios } };
-      const elements = computeElementQuantities(geometry, sections, { settings });
+      const design = useDesignRebar ? designRebarKg((await client.concreteDesign()).rows, geometry, sections) : null;
+      const elements = computeElementQuantities(geometry, sections, { settings, designRebarKg: design?.kgByFrame });
       const lines = buildBoq(elements, { groupBy, settings });
       const sample = defaultRateTable(lines, undefined, currency?.toUpperCase() ?? "INR");
       const table = rates
@@ -329,6 +339,7 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
         summary,
         unmeasured: issues.slice(0, 50),
         unmeasuredCount: issues.length,
+        rebarFromDesign: design ? { frames: design.kgByFrame.size, withoutShearEstimate: design.withoutShear.length } : null,
         notes: BOQ_NOTES,
       };
     }),
@@ -423,6 +434,130 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
       }
       const list = (loads[include] as Array<{ pattern: string }>).filter((x) => !pattern || x.pattern === pattern);
       return { units: loads.units, ...page(list, o, l) };
+    }),
+  );
+
+  server.registerTool(
+    "etabs_get_analysis_status",
+    {
+      title: "Analysis status",
+      description: "Whether the model is analysed (locked), the run status of every load case, and the combination names. Call before reading results.",
+      inputSchema: { instance },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid }) => resolver.client(pid).resultsStatus()),
+  );
+
+  server.registerTool(
+    "etabs_get_base_reactions",
+    {
+      title: "Base reactions",
+      description: "Base reaction forces and moments (FX, FY, FZ, MX, MY, MZ) for the given cases/combinations. Envelopes return Max and Min steps.",
+      inputSchema: { instance, cases, combos },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, cases: c, combos: k }) => resolver.client(pid).baseReactions({ cases: c, combos: k })),
+  );
+
+  server.registerTool(
+    "etabs_get_story_drifts",
+    {
+      title: "Story drifts",
+      description:
+        "Story drift ratios. Returns the envelope per story and direction (max |drift| and the governing case) plus the overall maximum; " +
+        "set includeRows for every row.",
+      inputSchema: { instance, cases, combos, includeRows: z.boolean().default(false) },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, cases: c, combos: k, includeRows }) => {
+      const client = resolver.client(pid);
+      const [drifts, geometry] = await Promise.all([client.storyDrifts({ cases: c, combos: k }), cached(client, "geometry", () => client.geometry())]);
+      const profile = driftProfile(drifts.rows, geometry);
+      const max = profile.flatMap((p) => Object.entries(p.drift).map(([direction, drift]) => ({ story: p.story, direction, drift, governing: p.governing[direction] })));
+      return {
+        cases: drifts.cases,
+        combinations: drifts.combinations,
+        envelope: profile,
+        maximum: max.reduce<(typeof max)[number] | null>((m, x) => (!m || x.drift > m.drift ? x : m), null),
+        ...(includeRows ? { rows: drifts.rows } : {}),
+        warnings: drifts.warnings,
+      };
+    }),
+  );
+
+  server.registerTool(
+    "etabs_get_joint_reactions",
+    {
+      title: "Joint (support) reactions",
+      description: "Support reactions F1-F3, M1-M3 for all supports or one joint, for the given cases/combinations; paged.",
+      inputSchema: { instance, cases, combos, joint: z.string().optional().describe("One joint name; omit for all supports."), offset, limit: limit(2000, 200) },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, cases: c, combos: k, joint, offset: o, limit: l }) =>
+      resolver.client(pid).jointReactions({ cases: c, combos: k, joint, offset: o, limit: l }),
+    ),
+  );
+
+  server.registerTool(
+    "etabs_get_joint_displacements",
+    {
+      title: "Joint displacements",
+      description: "Joint displacements U1-U3 and rotations R1-R3 (global) for one joint or all joints, for the given cases/combinations; paged.",
+      inputSchema: { instance, cases, combos, joint: z.string().optional(), offset, limit: limit(2000, 200) },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, cases: c, combos: k, joint, offset: o, limit: l }) =>
+      resolver.client(pid).jointDisplacements({ cases: c, combos: k, joint, offset: o, limit: l }),
+    ),
+  );
+
+  server.registerTool(
+    "etabs_get_frame_forces",
+    {
+      title: "Frame forces",
+      description: "Internal forces P, V2, V3, T, M2, M3 at output stations of one frame (recommended) or all frames (paged), for the given cases/combinations.",
+      inputSchema: { instance, cases, combos, frame: z.string().optional().describe("Frame unique name; omit for all frames (large)."), offset, limit: limit(2000, 200) },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, cases: c, combos: k, frame, offset: o, limit: l }) =>
+      resolver.client(pid).frameForces({ cases: c, combos: k, frame, offset: o, limit: l }),
+    ),
+  );
+
+  server.registerTool(
+    "etabs_get_concrete_design",
+    {
+      title: "Concrete design (required reinforcement)",
+      description:
+        "Required longitudinal and shear reinforcement from ETABS concrete frame design, summarised per frame (max areas, PMM ratio, " +
+        "estimated required rebar kg). Needs a designed model. Set includeStations for station-by-station rows (paged).",
+      inputSchema: { instance, frame: z.string().optional(), includeStations: z.boolean().default(false), offset, limit: limit(2000, 200) },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, frame, includeStations, offset: o, limit: l }) => {
+      const client = resolver.client(pid);
+      const [design, geometry, sections] = await Promise.all([
+        client.concreteDesign(),
+        cached(client, "geometry", () => client.geometry()),
+        cached(client, "sections", () => client.sections()),
+      ]);
+      const rows = design.rows.filter((r) => !frame || r.frame === frame);
+      if (includeStations) return { units: design.units, ...page(rows, o, l), warnings: design.warnings };
+      const kg = designRebarKg(rows, geometry, sections);
+      const summary = [...new Set(rows.map((r) => r.frame))].map((f) => {
+        const st = rows.filter((r) => r.frame === f);
+        return {
+          frame: f,
+          kind: st[0]!.kind,
+          maxTopArea: Math.max(...st.map((r) => r.topArea ?? 0)),
+          maxBottomArea: Math.max(...st.map((r) => r.bottomArea ?? 0)),
+          maxLongitudinalArea: Math.max(...st.map((r) => r.longitudinalArea ?? 0)),
+          maxShearAreaPerLength: Math.max(...st.map((r) => r.shearAreaPerLength ?? 0)),
+          maxRatio: st.some((r) => r.ratio !== null) ? Math.max(...st.map((r) => r.ratio ?? 0)) : null,
+          requiredRebarKg: Math.round((kg.kgByFrame.get(f) ?? 0) * 10) / 10,
+        };
+      });
+      return { units: design.units, ...page(summary, o, l), warnings: design.warnings };
     }),
   );
 

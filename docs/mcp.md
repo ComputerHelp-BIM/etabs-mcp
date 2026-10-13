@@ -48,6 +48,10 @@ Tokens never appear in tool output.
 | `etabs_get_boq` | Bill of quantities and cost (concrete, formwork, rebar, steel), with optional rates and rebar ratios; sample rates are flagged |
 | `etabs_generate_schedule` | 4D baseline schedule (story-by-story, working-day calendar) with cost per task and weekly cumulative cost |
 | `etabs_get_loads` | Load patterns, cases, combinations (with formulas), gravity takedown per pattern; or paged assigned loads by pattern |
+| `etabs_get_analysis_status` | Locked/analysed state, run status per case, combination names |
+| `etabs_get_base_reactions`, `etabs_get_story_drifts` | For chosen cases/combos; drifts as an envelope per story with the governing case |
+| `etabs_get_joint_reactions`, `etabs_get_joint_displacements`, `etabs_get_frame_forces` | Paged; one joint/frame or all |
+| `etabs_get_concrete_design` | Required reinforcement per frame (max areas, PMM ratio, estimated kg) |
 | `etabs_list_tables`, `etabs_get_table` | Any ETABS database table, searchable and paged |
 | `etabs_describe_api`, `etabs_call_api` | The whole CSI API. Writes are refused unless enabled in the plugin window |
 

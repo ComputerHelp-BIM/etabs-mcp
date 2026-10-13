@@ -45,6 +45,8 @@ export const ProjectSchema = z.object({
   rateTable: RateTableSchema.nullable(),
   boqGroupBy: z.enum(["item", "story"]),
   schedule: ScheduleSettingsSchema.optional(),
+  /** Use ETABS concrete design required steel in the BOQ for designed frames (0.6.0). */
+  useDesignRebar: z.boolean().optional(),
   /** Manually edited task dates, keyed by task id. */
   taskOverrides: z.record(z.string(), TaskOverrideSchema).optional(),
 });

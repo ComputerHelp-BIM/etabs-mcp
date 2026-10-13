@@ -26,7 +26,7 @@ namespace EtabsBridge.Core.Rpc
             Objects = ApiReflection.GetObjectProperties(type).Select(p => p.Name).Distinct().OrderBy(n => n, StringComparer.Ordinal).ToList(),
             Methods = ApiReflection.GetMethods(type)
                 .OrderBy(m => m.Name, StringComparer.Ordinal)
-                .Select(ApiMethodDescription.Create)
+                .Select(m => ApiMethodDescription.Create(m, path))
                 .ToList(),
         };
     }
@@ -42,11 +42,11 @@ namespace EtabsBridge.Core.Rpc
 
         public IReadOnlyList<ApiParameterDescription> Parameters { get; set; } = Array.Empty<ApiParameterDescription>();
 
-        internal static ApiMethodDescription Create(MethodInfo method) => new ApiMethodDescription
+        internal static ApiMethodDescription Create(MethodInfo method, string objectPath) => new ApiMethodDescription
         {
             Name = method.Name,
             ReturnType = ApiReflection.FriendlyName(method.ReturnType),
-            ReadOnly = RpcPolicy.IsReadOnly(method.Name),
+            ReadOnly = RpcPolicy.IsReadOnly(objectPath.Length == 0 ? method.Name : objectPath + "." + method.Name),
             Parameters = method.GetParameters().Select(ApiParameterDescription.Create).ToList(),
         };
     }

@@ -26,6 +26,10 @@ namespace EtabsBridge.Core.Http
     ///   GET  /geometry/{stories|grids|joints|frames|areas}
     ///   GET  /sections               materials, frame sections, area sections (0.2.0)
     ///   GET  /loads                  patterns, cases, combinations, assigned loads (0.5.0)
+    ///   GET  /results/status         analysis status of every case, combination names (0.6.0)
+    ///   GET  /results/{base-reactions|story-drifts|joint-reactions|joint-displacements|frame-forces}
+    ///        ?cases=A,B&amp;combos=C[&amp;joint=|frame=][&amp;offset=&amp;limit=]
+    ///   GET  /design/concrete        required reinforcement from concrete frame design (0.6.0)
     ///   GET  /tables                 database table catalogue
     ///   GET  /tables/data?key=..&amp;group=All&amp;fields=a,b&amp;offset=0&amp;limit=1000
     ///   GET  /rpc/describe?path=FrameObj
@@ -147,6 +151,13 @@ namespace EtabsBridge.Core.Http
             Get("/geometry/areas", (r, ct) => OnEtabs(() => (object)_geometry.GetAreas(), ct));
             Get("/sections", (r, ct) => OnEtabs(() => (object)new SectionService(_model).GetSections(), ct));
             Get("/loads", (r, ct) => OnEtabs(() => (object)new LoadsService(_model).GetLoads(), ct));
+            Get("/results/status", (r, ct) => OnEtabs(() => (object)new ResultsService(_model).GetStatus(), ct));
+            Get("/results/base-reactions", (r, ct) => Results(r, ct, (svc, sel) => svc.GetBaseReactions(sel)));
+            Get("/results/story-drifts", (r, ct) => Results(r, ct, (svc, sel) => svc.GetStoryDrifts(sel)));
+            Get("/results/joint-reactions", (r, ct) => Results(r, ct, (svc, sel) => svc.GetJointReactions(sel, Optional(r, "joint"))));
+            Get("/results/joint-displacements", (r, ct) => Results(r, ct, (svc, sel) => svc.GetJointDisplacements(sel, Optional(r, "joint"))));
+            Get("/results/frame-forces", (r, ct) => Results(r, ct, (svc, sel) => svc.GetFrameForces(sel, Optional(r, "frame"))));
+            Get("/design/concrete", (r, ct) => Paged(r, ct, () => new ResultsService(_model).GetConcreteDesign()));
             Get("/tables", (r, ct) => OnEtabs(() => (object)new TablesResult { Tables = _model.GetTables() }, ct));
             Get("/tables/data", GetTableAsync);
             Get("/rpc/describe", (r, ct) => OnEtabs(() => (object)_invoker.Describe(r.QueryValue("path")), ct));
@@ -201,6 +212,53 @@ namespace EtabsBridge.Core.Http
                     return (object)table;
                 },
                 ct);
+        }
+
+        private Task<object> Results<T>(BridgeRequest request, CancellationToken ct, Func<ResultsService, OutputSelection, ResultRows<T>> read)
+        {
+            var selection = new OutputSelection { Cases = List(request, "cases"), Combinations = List(request, "combos") };
+            if (selection.IsEmpty)
+            {
+                throw new BridgeException(400, ErrorCodes.BadRequest, "Select at least one load case (cases=...) or combination (combos=...). See /results/status.");
+            }
+
+            return Paged(request, ct, () => read(new ResultsService(_model), selection));
+        }
+
+        /// <summary>Runs a result read on the ETABS thread and applies offset/limit paging.</summary>
+        private Task<object> Paged<T>(BridgeRequest request, CancellationToken ct, Func<ResultRows<T>> read)
+        {
+            int offset = ParseNonNegative(request, "offset", 0);
+            int limit = ParseNonNegative(request, "limit", int.MaxValue);
+            return OnEtabs(
+                () =>
+                {
+                    ResultRows<T> rows = read();
+                    rows.TotalRows = rows.Rows.Count;
+                    rows.Offset = Math.Min(offset, rows.Rows.Count);
+                    if (offset > 0 || limit < rows.Rows.Count)
+                    {
+                        rows.Rows = rows.Rows.Skip(offset).Take(limit).ToList();
+                    }
+
+                    return (object)rows;
+                },
+                ct);
+        }
+
+        /// <summary>Comma-separated query list ("cases=Dead,Live"), trimmed, empty entries removed.</summary>
+        private static IReadOnlyList<string> List(BridgeRequest request, string name) =>
+            (request.QueryValue(name) ?? string.Empty)
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+        private static string? Optional(BridgeRequest request, string name)
+        {
+            string? v = request.QueryValue(name)?.Trim();
+            return string.IsNullOrEmpty(v) ? null : v;
         }
 
         private Task<object> InvokeRpcAsync(BridgeRequest request, CancellationToken ct)

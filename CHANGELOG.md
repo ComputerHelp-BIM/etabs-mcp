@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-10-13
+
+### Added
+
+- **Analysis results**: `/results/status` (case run status, combinations), `/results/base-reactions`,
+  `/results/story-drifts`, `/results/joint-reactions`, `/results/joint-displacements`, `/results/frame-forces`
+  (select cases/combos, paged). Read by late binding with output selection through `Results.Setup`.
+- **Concrete design**: `/design/concrete` required longitudinal/shear steel and PMM ratios per frame and station.
+- **Design rebar in the BOQ**: required steel converted to kg per frame, optionally replacing kg/m³ ratios.
+- Web app **Results** tab: case/combination picker; base reactions with a gravity cross-check against the load
+  takedown; story drift profile chart with a drift limit; deformed shape in 3D; frame force diagrams; concrete design.
+- MCP tools `etabs_get_analysis_status`, `etabs_get_base_reactions`, `etabs_get_story_drifts`,
+  `etabs_get_joint_reactions`, `etabs_get_joint_displacements`, `etabs_get_frame_forces`, `etabs_get_concrete_design`;
+  `etabs_get_boq` gains `useDesignRebar`.
+- Mock bridge: consistent synthetic results (clearly flagged). See `docs/results.md`.
+
+### Changed
+
+- RPC policy: every method of the CSI `Results` object (results readers and `Results.Setup` output selection) is
+  read-only, since none changes model data.
+- Line charts support negative values (moment and shear diagrams).
+
 ## [0.5.0] - 2026-10-13
 
 ### Added

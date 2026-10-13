@@ -873,3 +873,74 @@ tr.edited td:first-child {
 .chart-plot {
   position: relative;
 }
+
+/* Results */
+.selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.selector h3 {
+  margin-top: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  background: var(--surface);
+}
+
+.chip.disabled {
+  opacity: 0.55;
+}
+
+.subtabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.subtabs button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 0.45rem 0.7rem;
+  white-space: nowrap;
+}
+
+.subtabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-ok {
+  color: #1a7f37;
+  font-weight: 600;
+}
+
+.status-bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .status-ok {
+    color: #4ac26b;
+  }
+}
