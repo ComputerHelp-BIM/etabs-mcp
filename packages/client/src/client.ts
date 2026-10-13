@@ -9,6 +9,7 @@ import {
   GridsResultSchema,
   HealthSchema,
   JointsResultSchema,
+  LoadsResultSchema,
   ModelInfoSchema,
   SectionsResultSchema,
   StoriesResultSchema,
@@ -22,6 +23,7 @@ import {
   type GridsResult,
   type Health,
   type JointsResult,
+  type LoadsResult,
   type ModelInfo,
   type SectionsResult,
   type StoriesResult,
@@ -140,6 +142,11 @@ export class BridgeClient {
   /** Materials, frame sections and area sections (with dimensions and properties). Since bridge 0.2.0. */
   sections(): Promise<SectionsResult> {
     return this.request("GET", "/sections", SectionsResultSchema);
+  }
+
+  /** Load patterns, cases, combinations and assigned loads. Since bridge 0.5.0. */
+  loads(): Promise<LoadsResult> {
+    return this.request("GET", "/loads", LoadsResultSchema);
   }
 
   /** Catalogue of ETABS database tables (Display > Show Tables). */

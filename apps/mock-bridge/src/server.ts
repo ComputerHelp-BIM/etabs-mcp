@@ -80,6 +80,7 @@ export async function startMockBridge(options: MockBridgeOptions = {}): Promise<
     "/geometry/frames": { GET: async () => (await delay(), { units: model.geometry.units, frames: model.geometry.frames }) },
     "/geometry/areas": { GET: async () => (await delay(), { units: model.geometry.units, areas: model.geometry.areas }) },
     "/sections": { GET: async () => (await delay(), model.sections) },
+    "/loads": { GET: async () => (await delay(), model.loads) },
     "/tables": { GET: async () => (await delay(), { tables: model.tables }) },
     "/tables/data": { GET: async (url) => (await delay(), tableData(url)) },
     "/rpc/describe": { GET: async (url) => describe(url.searchParams.get("path") ?? "") },

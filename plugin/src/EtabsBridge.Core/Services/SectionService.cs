@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Linq;
 using EtabsBridge.Core.Model;
 using EtabsBridge.Core.Ports;
 using EtabsBridge.Core.Rpc;
@@ -20,8 +20,6 @@ namespace EtabsBridge.Core.Services
     /// </summary>
     public sealed class SectionService
     {
-        private const int MaxWarnings = 50;
-
         /// <summary>Normalized frame shape -> dimension getters to try, newest first.</summary>
         private static readonly Dictionary<string, string[]> DimensionGetters = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
@@ -36,20 +34,17 @@ namespace EtabsBridge.Core.Services
         };
 
         private readonly IEtabsModel _model;
-        private readonly ApiInvoker _api;
-        private readonly List<string> _warnings = new List<string>();
-        private readonly HashSet<string> _missingMethods = new HashSet<string>(StringComparer.Ordinal);
+        private LateBoundApi _api;
 
         public SectionService(IEtabsModel model)
         {
             _model = model ?? throw new ArgumentNullException(nameof(model));
-            _api = new ApiInvoker(model.ApiRoot, model.ApiRootType, () => false); // read-only by construction
+            _api = new LateBoundApi(model);
         }
 
         public SectionsResult GetSections()
         {
-            _warnings.Clear();
-            _missingMethods.Clear();
+            _api = new LateBoundApi(_model); // fresh warnings per read
             var result = new SectionsResult
             {
                 Units = EtabsConventions.ParseUnits(_model.GetModelInfo().UnitsName),
@@ -57,7 +52,7 @@ namespace EtabsBridge.Core.Services
                 FrameSections = ReadFrameSections(),
                 AreaSections = ReadAreaSections(),
             };
-            result.Warnings = _warnings.ToArray();
+            result.Warnings = _api.Warnings.ToArray();
             return result;
         }
 
@@ -144,7 +139,7 @@ namespace EtabsBridge.Core.Services
 
                 if (DimensionGetters.TryGetValue(s.Shape, out string[]? getters))
                 {
-                    ApiCallResult? dims = FirstAvailable(getters, name);
+                    ApiCallResult? dims = _api.FirstAvailable(Array.ConvertAll(getters, g => "PropFrame." + g), $"frame section '{name}'", name);
                     if (dims != null)
                     {
                         s.Material = Text(dims, "MatProp") ?? string.Empty;
@@ -190,22 +185,6 @@ namespace EtabsBridge.Core.Services
             }
 
             return list;
-        }
-
-        private ApiCallResult? FirstAvailable(string[] getters, string name)
-        {
-            foreach (string getter in getters)
-            {
-                string method = "PropFrame." + getter;
-                ApiCallResult? result = Call(method, quiet: true, name);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-
-            Warn($"No dimension getter worked for frame section '{name}' (tried {string.Join(", ", getters)}).");
-            return null;
         }
 
         // ---------------------------------------------------------------- area sections
@@ -317,102 +296,18 @@ namespace EtabsBridge.Core.Services
             }
         }
 
-        // ---------------------------------------------------------------- late-binding helpers
+        private IEnumerable<string> NameList(string method) => _api.NameList(method);
 
-        private IEnumerable<string> NameList(string method)
-        {
-            ApiCallResult? r = Call(method);
-            if (r == null)
-            {
-                return Array.Empty<string>();
-            }
+        private ApiCallResult? Call(string method, params object?[] inputs) => _api.Call(method, inputs);
 
-            return r.Outputs.TryGetValue("MyName", out object? names) && names is string[] array ? array : Array.Empty<string>();
-        }
+        private ApiCallResult? Call(string method, bool quiet, params object?[] inputs) => _api.Call(method, quiet, inputs);
 
-        private ApiCallResult? Call(string method, params object?[] inputs) => Call(method, false, inputs);
+        private void Warn(string message) => _api.Warn(message);
 
-        /// <summary>
-        /// Calls an API method by name. Returns null (and records a warning unless <paramref name="quiet"/>)
-        /// when the method is missing, throws, or returns a non-zero status.
-        /// </summary>
-        private ApiCallResult? Call(string method, bool quiet, params object?[] inputs)
-        {
-            try
-            {
-                ApiCallResult r = _api.InvokeWithInputs(method, inputs);
-                if (r.ReturnValue is int rc && rc != 0)
-                {
-                    if (!quiet)
-                    {
-                        Warn($"{method}({Describe(inputs)}) returned {rc}.");
-                    }
+        private static double? Number(ApiCallResult? r, string key) => LateBoundApi.Number(r, key);
 
-                    return null;
-                }
+        private static string? Text(ApiCallResult? r, string key) => LateBoundApi.Text(r, key);
 
-                return r;
-            }
-            catch (BridgeException ex) when (ex.Status == 404 || ex.Status == 400)
-            {
-                // Signature/method not present in this ETABS version: report once per method.
-                if (!quiet && _missingMethods.Add(method))
-                {
-                    Warn($"{method} is not available in this ETABS version: {ex.Message}");
-                }
-
-                return null;
-            }
-            catch (EtabsApiException ex)
-            {
-                if (!quiet)
-                {
-                    Warn(ex.Message);
-                }
-
-                return null;
-            }
-        }
-
-        private void Warn(string message)
-        {
-            if (_warnings.Count < MaxWarnings)
-            {
-                _warnings.Add(message);
-            }
-            else if (_warnings.Count == MaxWarnings)
-            {
-                _warnings.Add("(more warnings omitted)");
-            }
-        }
-
-        private static string Describe(object?[] inputs) =>
-            string.Join(", ", Array.ConvertAll(inputs, i => Convert.ToString(i, CultureInfo.InvariantCulture)));
-
-        private static double? Number(ApiCallResult? r, string key)
-        {
-            if (r == null || !r.Outputs.TryGetValue(key, out object? v) || v == null)
-            {
-                return null;
-            }
-
-            switch (v)
-            {
-                case double d:
-                    return double.IsNaN(d) || double.IsInfinity(d) ? (double?)null : d;
-                case float f:
-                    return f;
-                case int i:
-                    return i;
-                default:
-                    return null;
-            }
-        }
-
-        private static string? Text(ApiCallResult? r, string key) =>
-            r != null && r.Outputs.TryGetValue(key, out object? v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : null;
-
-        private static string ColorOf(ApiCallResult? r, string key) =>
-            r != null && r.Outputs.TryGetValue(key, out object? v) && v is int color ? EtabsConventions.OleColorToHex(color) : "#808080";
+        private static string ColorOf(ApiCallResult? r, string key) => LateBoundApi.Color(r, key);
     }
 }

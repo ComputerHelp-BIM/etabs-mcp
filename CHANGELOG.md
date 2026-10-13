@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-13
+
+### Added
+
+- **Loads** (`GET /api/v1/loads`): load patterns (type, self-weight multiplier), load cases (type), combinations
+  (type and factored items), and assigned loads for the whole model: frame distributed and point loads, area uniform
+  loads, joint forces. Late-bound like sections: missing getters give warnings, not failures.
+- **Gravity takedown** per pattern (area + line + point + joint loads in the gravity direction), a quick independent
+  check against base reactions.
+- Web app **Loads** tab (takedown, cases, combinations, assigned loads by pattern; loaded on first open).
+- MCP tool `etabs_get_loads`; `BridgeClient.loads()`; mock bridge sample loads.
+
+### Changed
+
+- Internal: shared `LateBoundApi` for the late-bound readers (sections, loads, results).
+
 ## [0.4.0] - 2026-10-13
 
 ### Added

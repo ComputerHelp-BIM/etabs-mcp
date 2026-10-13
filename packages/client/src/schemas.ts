@@ -242,6 +242,60 @@ export const SectionsResultSchema = z.object({
   warnings: z.array(z.string()),
 });
 
+// ---- Loads (0.5.0). Values in the model's present units.
+
+export const LoadPatternSchema = z.object({ name: z.string(), type: z.string(), selfWeightMultiplier: z.number().nullable() });
+export const LoadCaseSchema = z.object({ name: z.string(), type: z.string(), subType: z.number().int().nullable() });
+export const CombinationItemSchema = z.object({ kind: z.enum(["LoadCase", "LoadCombo"]), name: z.string(), factor: z.number() });
+export const LoadCombinationSchema = z.object({ name: z.string(), type: z.string(), items: z.array(CombinationItemSchema) });
+export const FrameDistributedLoadSchema = z.object({
+  frame: z.string(),
+  pattern: z.string(),
+  loadType: z.enum(["Force", "Moment"]),
+  cSys: z.string(),
+  /** 1-3 local, 4-6 global X/Y/Z, 7-9 projected X/Y/Z, 10 gravity, 11 projected gravity. */
+  direction: z.number().int(),
+  relativeStart: z.number(),
+  relativeEnd: z.number(),
+  distanceStart: z.number(),
+  distanceEnd: z.number(),
+  valueStart: z.number(),
+  valueEnd: z.number(),
+});
+export const FramePointLoadSchema = z.object({
+  frame: z.string(),
+  pattern: z.string(),
+  loadType: z.enum(["Force", "Moment"]),
+  cSys: z.string(),
+  direction: z.number().int(),
+  relativeDistance: z.number(),
+  distance: z.number(),
+  value: z.number(),
+});
+export const AreaUniformLoadSchema = z.object({ area: z.string(), pattern: z.string(), cSys: z.string(), direction: z.number().int(), value: z.number() });
+export const JointLoadSchema = z.object({
+  joint: z.string(),
+  pattern: z.string(),
+  cSys: z.string(),
+  f1: z.number(),
+  f2: z.number(),
+  f3: z.number(),
+  m1: z.number(),
+  m2: z.number(),
+  m3: z.number(),
+});
+export const LoadsResultSchema = z.object({
+  units: UnitsInfoSchema,
+  patterns: z.array(LoadPatternSchema),
+  cases: z.array(LoadCaseSchema),
+  combinations: z.array(LoadCombinationSchema),
+  frameDistributed: z.array(FrameDistributedLoadSchema),
+  framePoint: z.array(FramePointLoadSchema),
+  areaUniform: z.array(AreaUniformLoadSchema),
+  jointLoads: z.array(JointLoadSchema),
+  warnings: z.array(z.string()),
+});
+
 export const TableInfoSchema = z.object({
   key: z.string(),
   name: z.string(),
@@ -323,6 +377,14 @@ export type FrameShape = z.infer<typeof FrameSectionSchema>["shape"];
 export type FrameSection = z.infer<typeof FrameSectionSchema>;
 export type AreaSection = z.infer<typeof AreaSectionSchema>;
 export type SectionsResult = z.infer<typeof SectionsResultSchema>;
+export type LoadPattern = z.infer<typeof LoadPatternSchema>;
+export type LoadCase = z.infer<typeof LoadCaseSchema>;
+export type LoadCombination = z.infer<typeof LoadCombinationSchema>;
+export type FrameDistributedLoad = z.infer<typeof FrameDistributedLoadSchema>;
+export type FramePointLoad = z.infer<typeof FramePointLoadSchema>;
+export type AreaUniformLoad = z.infer<typeof AreaUniformLoadSchema>;
+export type JointLoad = z.infer<typeof JointLoadSchema>;
+export type LoadsResult = z.infer<typeof LoadsResultSchema>;
 export type TableInfo = z.infer<typeof TableInfoSchema>;
 export type TablesResult = z.infer<typeof TablesResultSchema>;
 export type TableData = z.infer<typeof TableDataSchema>;

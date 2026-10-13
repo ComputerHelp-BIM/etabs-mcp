@@ -10,8 +10,10 @@ import {
   computeElementQuantities,
   costCurve,
   defaultScheduleSettings,
+  describeCombination,
   generateSchedule,
   isoFromTime,
+  loadTakedown,
   scheduleSpan,
   taskCosts,
   defaultRateTable,
@@ -28,7 +30,7 @@ import {
 import { ConnectionError, type ConnectionResolver } from "./connection.js";
 
 export const SERVER_NAME = "etabs-bridge";
-export const SERVER_VERSION = "0.4.0";
+export const SERVER_VERSION = "0.5.0";
 
 export interface ServerOptions {
   resolver: ConnectionResolver;
@@ -376,6 +378,51 @@ export function createEtabsMcpServer(options: ServerOptions): McpServer {
         tasks: tasks.map(({ elements: els, ...t }) => ({ ...t, objects: els.length, cost: Math.round(costs.get(t.id) ?? 0) })),
         weeklyCumulativeCost: weekly,
       };
+    }),
+  );
+
+  server.registerTool(
+    "etabs_get_loads",
+    {
+      title: "Loads",
+      description:
+        "Load patterns (type, self-weight multiplier), load cases, combinations (with factors) and a gravity takedown per " +
+        "pattern (total assigned downward load, excluding self-weight). Set include to list assigned loads " +
+        "(frame distributed/point, area uniform, joint), paged and filterable by pattern. Values in model units.",
+      inputSchema: {
+        instance,
+        include: z
+          .enum(["summary", "frameDistributed", "framePoint", "areaUniform", "jointLoads"])
+          .default("summary")
+          .describe("'summary' = patterns, cases, combinations, takedown; otherwise one list of assigned loads."),
+        pattern: z.string().optional().describe("Only assigned loads of this pattern."),
+        offset,
+        limit: limit(1000, 200),
+      },
+      annotations: READ_ONLY,
+    },
+    safe(async ({ instance: pid, include, pattern, offset: o, limit: l }) => {
+      const client = resolver.client(pid);
+      const loads = await cached(client, "loads", () => client.loads());
+      if (include === "summary") {
+        const geometry = await cached(client, "geometry", () => client.geometry());
+        return {
+          units: loads.units,
+          patterns: loads.patterns,
+          cases: loads.cases,
+          combinations: loads.combinations.map((c) => ({ ...c, formula: describeCombination(c.items) })),
+          gravityTakedown: loadTakedown(loads, geometry),
+          assignedCounts: {
+            frameDistributed: loads.frameDistributed.length,
+            framePoint: loads.framePoint.length,
+            areaUniform: loads.areaUniform.length,
+            jointLoads: loads.jointLoads.length,
+          },
+          warnings: loads.warnings,
+        };
+      }
+      const list = (loads[include] as Array<{ pattern: string }>).filter((x) => !pattern || x.pattern === pattern);
+      return { units: loads.units, ...page(list, o, l) };
     }),
   );
 

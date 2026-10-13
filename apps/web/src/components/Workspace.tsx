@@ -20,6 +20,7 @@ import { useProject } from "../state/useProject";
 import { ApiConsole } from "./ApiConsole";
 import { BoqView } from "./BoqView";
 import { FourDView } from "./FourDView";
+import { LoadsView } from "./LoadsView";
 import { explain } from "./ConnectPanel";
 import { DataTable, type Column } from "./DataTable";
 import type { Selection } from "./ModelViewer";
@@ -38,6 +39,7 @@ const TABS = [
   "Areas",
   "Sections",
   "Materials",
+  "Loads",
   "BOQ & Cost",
   "4D Simulation",
   "Database tables",
@@ -58,6 +60,14 @@ export function Workspace({ client, onDisconnect }: Props) {
     [client],
   );
   const sections = sectionsState.data ?? null;
+  // Loads arrived in bridge 0.5.0; loaded only when the tab is first opened (assigned loads can be large).
+  const [wantLoads, setWantLoads] = useState(false);
+  const loadsState = useAsync(
+    wantLoads
+      ? () => client.loads().catch((err: unknown) => (err instanceof BridgeError && err.code === "NOT_FOUND" ? null : Promise.reject(err)))
+      : null,
+    [client, wantLoads],
+  );
   const modelKey = geometry.data ? geometry.data.model.filePath || geometry.data.model.fileName || "unsaved" : "unsaved";
   const [project, updateProject, replaceProject] = useProject(modelKey);
   const elements = useMemo(() => {
@@ -91,6 +101,7 @@ export function Workspace({ client, onDisconnect }: Props) {
             onClick={() => {
               geometry.reload();
               sectionsState.reload();
+              if (wantLoads) loadsState.reload();
             }}
             disabled={geometry.status === "loading"}
           >
@@ -104,7 +115,17 @@ export function Workspace({ client, onDisconnect }: Props) {
 
       <nav className="tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={t === tab} className={t === tab ? "active" : undefined} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={t === tab}
+            className={t === tab ? "active" : undefined}
+            onClick={() => {
+              setTab(t);
+              if (t === "Loads") setWantLoads(true);
+            }}
+          >
             {t}
           </button>
         ))}
@@ -149,6 +170,12 @@ export function Workspace({ client, onDisconnect }: Props) {
         {g && tab === "Areas" && <AreasTable geometry={g} onSelect={(a) => setSelection({ kind: "area", name: a.name })} selected={selection} />}
         {tab === "Sections" && <SectionsView sections={sections} loading={sectionsState.status === "loading"} geometry={g} />}
         {tab === "Materials" && <MaterialsView sections={sections} loading={sectionsState.status === "loading"} />}
+        {g && tab === "Loads" &&
+          (loadsState.status === "error" ? (
+            <p className="error banner">{explain(loadsState.error)}</p>
+          ) : (
+            <LoadsView loads={loadsState.data ?? null} loading={loadsState.status !== "success"} geometry={g} />
+          ))}
         {g && tab === "BOQ & Cost" &&
           (elements ? (
             <BoqView

@@ -58,6 +58,7 @@ describe("MCP server against the mock bridge", () => {
         "etabs_get_sections",
         "etabs_get_boq",
         "etabs_generate_schedule",
+        "etabs_get_loads",
         "etabs_list_tables",
         "etabs_get_table",
         "etabs_describe_api",
@@ -134,6 +135,17 @@ describe("MCP server against the mock bridge", () => {
     const sumTasks = res.json.tasks.reduce((s: number, t: { cost: number }) => s + t.cost, 0);
     expect(Math.abs(last.cumulativeCost - sumTasks)).toBeLessThanOrEqual(12); // rounding per task
     expect(res.json.ratesAreSamples).toBe(true);
+  });
+
+  it("summarizes loads and pages assigned loads", async () => {
+    const sum = await call(client, "etabs_get_loads");
+    expect(sum.json.patterns).toHaveLength(4);
+    expect(sum.json.combinations[0].formula).toBe("1.5 × Dead + 1.5 × SDL + 1.5 × Live");
+    const live = sum.json.gravityTakedown.find((r: { pattern: string }) => r.pattern === "Live");
+    expect(live.total).toBeCloseTo(72 * 30 * 3); // 72 slabs of 6 x 5 m at 3 kN/m²
+    const areas = await call(client, "etabs_get_loads", { include: "areaUniform", pattern: "Live", limit: 10 });
+    expect(areas.json.total).toBe(72);
+    expect(areas.json.returned).toBe(10);
   });
 
   it("validates tool input", async () => {

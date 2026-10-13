@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BridgeClient, BridgeError, GeometrySnapshotSchema, SectionsResultSchema, summarizeGeometry } from "@etabs-bridge/client";
+import { BridgeClient, BridgeError, GeometrySnapshotSchema, LoadsResultSchema, SectionsResultSchema, loadTakedown, summarizeGeometry } from "@etabs-bridge/client";
 import { listInstances } from "@etabs-bridge/client/registry";
 import { createSampleModel, startMockBridge, type MockBridge } from "../src/index.js";
 
@@ -34,6 +34,16 @@ describe("createSampleModel", () => {
     for (const f of geometry.frames) expect(frameSections.has(f.section)).toBe(true);
     for (const a of geometry.areas) expect(areaSections.has(a.section)).toBe(true);
     for (const s of [...sections.frameSections, ...sections.areaSections]) expect(materials.has(s.material)).toBe(true);
+  });
+
+  it("has consistent sample loads", () => {
+    const { geometry, loads } = createSampleModel({ baysX: 2, baysY: 1, stories: 2 });
+    LoadsResultSchema.parse(loads);
+    const t = loadTakedown(loads, geometry);
+    // 2 floors x 12 x 5 m = 120 m² x 3 kN/m²
+    expect(t.find((r) => r.pattern === "Live")!.total).toBeCloseTo(360);
+    // SDL: 120 m² x 1.5 + perimeter beams (2 x (12 + 5) = 34 m per floor) x 10 kN/m x 2 floors
+    expect(t.find((r) => r.pattern === "SDL")!.total).toBeCloseTo(180 + 680);
   });
 
   it("rejects empty buildings", () => {
@@ -79,6 +89,7 @@ describe("mock bridge over HTTP", () => {
     expect((await client.frames()).frames).toHaveLength(g.frames.length);
     expect((await client.areas()).areas).toHaveLength(g.areas.length);
     expect((await client.sections()).frameSections.map((s) => s.name)).toContain("B300x600");
+    expect((await client.loads()).combinations.map((c) => c.name)).toContain("ENVELOPE");
   });
 
   it("serves database tables with paging and field selection", async () => {

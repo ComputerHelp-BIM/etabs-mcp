@@ -25,6 +25,7 @@ namespace EtabsBridge.Core.Http
     ///   GET  /geometry               full snapshot (stories, grids, joints, frames, areas)
     ///   GET  /geometry/{stories|grids|joints|frames|areas}
     ///   GET  /sections               materials, frame sections, area sections (0.2.0)
+    ///   GET  /loads                  patterns, cases, combinations, assigned loads (0.5.0)
     ///   GET  /tables                 database table catalogue
     ///   GET  /tables/data?key=..&amp;group=All&amp;fields=a,b&amp;offset=0&amp;limit=1000
     ///   GET  /rpc/describe?path=FrameObj
@@ -145,6 +146,7 @@ namespace EtabsBridge.Core.Http
             Get("/geometry/frames", (r, ct) => OnEtabs(() => (object)_geometry.GetFrames(), ct));
             Get("/geometry/areas", (r, ct) => OnEtabs(() => (object)_geometry.GetAreas(), ct));
             Get("/sections", (r, ct) => OnEtabs(() => (object)new SectionService(_model).GetSections(), ct));
+            Get("/loads", (r, ct) => OnEtabs(() => (object)new LoadsService(_model).GetLoads(), ct));
             Get("/tables", (r, ct) => OnEtabs(() => (object)new TablesResult { Tables = _model.GetTables() }, ct));
             Get("/tables/data", GetTableAsync);
             Get("/rpc/describe", (r, ct) => OnEtabs(() => (object)_invoker.Describe(r.QueryValue("path")), ct));
