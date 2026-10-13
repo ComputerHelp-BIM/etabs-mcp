@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Plugin zip: entry names now use `/` as the zip spec requires. The 0.6.1 zip was written by Windows PowerShell's
+  `Compress-Archive` with `\`; it extracts correctly with Windows Explorer and 7-Zip, but not with strict tools on
+  other systems.
+
+### Changed
+
+- Plugin workflow: release runs (tag or manual) are never cancelled by a later push.
+
 ## [0.6.1] - 2026-10-13
 
 ### Added

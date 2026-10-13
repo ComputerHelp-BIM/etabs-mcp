@@ -24,9 +24,11 @@ on:
 permissions:
   contents: read
 
+# Plain builds of the same ref supersede each other; a release (tag or manual) gets its own group and is
+# never cancelled, so a push to dev cannot interrupt a release half-way.
 concurrency:
-  group: plugin-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  group: plugin-${{ github.ref }}-${{ (github.ref_type == 'tag' || inputs.release) && 'release' || 'build' }}
+  cancel-in-progress: ${{ !(github.ref_type == 'tag' || inputs.release) }}
 
 jobs:
   build:
@@ -119,8 +121,21 @@ jobs:
             '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
           }
           Set-Content -Path (Join-Path $stage 'SHA256SUMS.txt') -Value $sums -Encoding ASCII
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Compress-Archive -Path "$stage/*" -DestinationPath "dist/$name.zip" -Force
+          # Not Compress-Archive: Windows PowerShell 5.1 writes "\" into entry names, which the zip spec forbids
+          # (non-Windows tools then extract "net48\EtabsBridgePlugin.dll" as one file name). Name entries explicitly.
+          Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+          $distDir = (New-Item -ItemType Directory -Path dist -Force).FullName
+          $zipPath = Join-Path $distDir "$name.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          $zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+          try {
+            Get-ChildItem $stage -Recurse -File | Sort-Object FullName | ForEach-Object {
+              $entryName = $_.FullName.Substring($stage.Length + 1).Replace('\', '/')
+              [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal)
+            }
+          } finally {
+            $zip.Dispose()
+          }
           ('{0}  {1}.zip' -f (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower(), $name) | Set-Content "dist/$name.zip.sha256" -Encoding ASCII
           Get-ChildItem dist | Format-Table Name, Length
 
