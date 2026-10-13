@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npx --yes npm@11 ci",
-  "buildCommand": "npm run build -w @etabs-bridge/client && npm run build -w @etabs-bridge/web",
+  "buildCommand": "npm run build:libs && npm run build -w @etabs-bridge/web",
   "outputDirectory": "apps/web/dist",
   "headers": [
     {

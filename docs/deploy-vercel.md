@@ -17,7 +17,7 @@ ETABS + ETABS Bridge plugin (same PC)
 1. In Vercel: **Add New → Project →** import `ComputerHelp-BIM/etabs-mcp`.
 2. **Root Directory:** leave it as the repository root. `vercel.json` already sets:
    - install `npx --yes npm@11 ci` (npm 11 is needed for the workspace install)
-   - build `npm run build -w @etabs-bridge/client && npm run build -w @etabs-bridge/web`
+   - build `npm run build:libs && npm run build -w @etabs-bridge/web`
    - output `apps/web/dist`
    - security headers, including a Content-Security-Policy that only allows the app to call itself and `localhost`
 3. **Production Branch:** `dev` (or `main` later), under Settings → Git.

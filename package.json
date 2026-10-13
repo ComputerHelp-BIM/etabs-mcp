@@ -16,9 +16,10 @@
     "npm": ">=11"
   },
   "scripts": {
-    "build": "npm run build -w @etabs-bridge/client && npm run build -w @etabs-bridge/mock-bridge -w @etabs-bridge/mcp-server -w @etabs-bridge/web",
-    "typecheck": "npm run build -w @etabs-bridge/client && npm run typecheck --workspaces --if-present",
-    "test": "npm run build -w @etabs-bridge/client && npm run test --workspaces --if-present",
+    "build:libs": "npm run build -w @etabs-bridge/client && npm run build -w @etabs-bridge/mock-bridge",
+    "build": "npm run build:libs && npm run build -w @etabs-bridge/mcp-server -w @etabs-bridge/web",
+    "typecheck": "npm run build:libs && npm run typecheck --workspaces --if-present",
+    "test": "npm run build:libs && npm run test --workspaces --if-present",
     "check-versions": "node scripts/check-versions.mjs",
     "mock": "npm run build -w @etabs-bridge/client -w @etabs-bridge/mock-bridge && npm run start -w @etabs-bridge/mock-bridge",
     "dev:web": "npm run dev -w @etabs-bridge/web"
